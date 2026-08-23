@@ -107,9 +107,13 @@ def parse_show_tip_calls() -> list[tuple[str | None, str]]:
                     if not sub.args or (len(sub.args) == 1 and isinstance(sub.args[0], ast.Constant)):
                         name = sub.args[0].value if sub.args else cmd_meta[1]
                         calls.append((cmd_meta[0], name))
-                elif sub.args and len(sub.args) == 1 and isinstance(sub.args[0], ast.Constant):
-                    # callback：_show_tip("name")，group 待校验层反查
-                    calls.append((None, sub.args[0].value))
+                elif sub.args and all(isinstance(a, ast.Constant) for a in sub.args[:2]):
+                    if len(sub.args) == 2:
+                        # callback：_show_tip("group", "name") 显式指定分组（命令名可能跨分组重名）
+                        calls.append((sub.args[0].value, sub.args[1].value))
+                    elif len(sub.args) == 1:
+                        # callback：_show_tip("name")，group 待校验层反查
+                        calls.append((None, sub.args[0].value))
     return calls
 
 

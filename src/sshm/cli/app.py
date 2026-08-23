@@ -92,36 +92,33 @@ def _fail_exit(manager: SSHKeyManager) -> None:
         raise SystemExit(1)
 
 
-def _show_tip(name: str | None = None) -> None:
+def _show_tip(group: str | None = None, name: str | None = None) -> None:
     """输出"本组相关命令" tip（从注册表推导，dim 淡色突出主次）。
 
     Args:
-        name: 可选。命令名，用于 callback（如 backup_default）等非 `_cmd`
-            注册的函数；不传时自动从 `_cmd` 装饰器记录的 `__sshm_command__`
-            反查当前命令，避免在调用点手写 group/name（与 registry 重复）。
+        group: 可选。显式指定分组。命令函数内无需传（自动从 `_cmd`
+            装饰器记录的 `__sshm_command__` 反查）；仅 callback（如
+            backup_default）因无 `__sshm_command__` 需显式传入 group+name。
+        name: 可选。显式指定命令名。与 group 必须成对传；命令名跨分组
+            可能重名（如 key/backup/author 都有 list），**禁止只传 name**
+            由本函数反查分组（有歧义），必须同时传 group。
     """
     from ..ui.tip import related_command_blocks, render_tip_block
 
-    if name is None:
+    if group is not None and name is not None:
+        cmd_group: str = group
+        current: str = name
+    else:
         frame = sys._getframe(1)
         fn = frame.f_globals.get(frame.f_code.co_name)
         cmd = getattr(fn, "__sshm_command__", None)
         if not cmd:
             return
-        group, current = cmd
-    else:
-        # 从命令名反查分组（命令名全局唯一）
-        meta = next(
-            (m for cmds in _registry.GROUPS.values() for m in cmds if m.name == name),
-            None,
-        )
-        if not meta:
-            return
-        group, current = meta.group, name
-    cmds = related_commands(group, current)
+        cmd_group, current = cmd
+    cmds = related_commands(cmd_group, current)
     if not cmds:
         return
-    for block in related_command_blocks(group, cmds):
+    for block in related_command_blocks(cmd_group, cmds):
         render_tip_block(block, style="dim")
 
 
@@ -425,7 +422,7 @@ def backup_default(
         manager = _manager()
         manager.backup.list()
         _fail_exit(manager)
-        _show_tip("list")
+        _show_tip("backup", "list")
 
 
 @_cmd(backup_app, "backup", "create")
