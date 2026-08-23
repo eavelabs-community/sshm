@@ -32,13 +32,16 @@ SSHManager/
 │       │   ├── i18n_en.py       # 英文 (EN) 字典
 │       │   ├── i18n_zh.py       # 中文 (ZH) 字典
 │       │   └── __init__.py      # language 包导出
-│       ├── cli/                 # 交互适配层（参数解析 / 渲染）
-│       │   ├── cli.py           # Typer 主应用（16 命令 + author 子命令）
-│       │   ├── interactive.py   # 交互式 TUI 菜单
-│       │   └── __init__.py      # 导出 app + 交互菜单
+│       ├── cli/                 # CLI 层（Typer 参数解析 / 渲染）
+│       │   ├── app.py           # Typer 命令定义（命令注册由 registry 驱动）
+│       │   ├── registry.py      # 命令注册表（分组 / 命令名 / help_key 单一事实来源）
+│       │   ├── suggest.py       # 未知命令 / 用法错误的模糊建议
+│       │   └── __init__.py      # 导出 app
 │       ├── ui/                  # 展示层
 │       │   ├── output.py        # Output 抽象 + ConsoleOutput / NullOutput
-│       │   └── console.py       # 表格渲染 / 对齐 / 确认 / Windows 编码
+│       │   ├── console.py       # 表格渲染 / 对齐 / 确认 / Windows 编码
+│       │   ├── icons.py         # 语义图标翻译助手（ok/warn/tip/done/err）
+│       │   └── tip.py           # 相关命令 tip / 错误提示模板渲染
 │       ├── core/                # 业务核心层
 │       │   ├── manager.py       # SSHKeyManager 门面（组合 services + commands）
 │       │   ├── errors.py        # 业务异常（SSHMError / ValidationError）
@@ -71,7 +74,7 @@ SSHManager/
 
 ### 分层结构
 
-- **cli 层**：交互适配（参数解析 / Typer / 交互菜单），只负责翻译用户意图并调用门面
+- **cli 层**：交互适配（Typer 参数解析 / 命令注册表驱动），只负责翻译用户意图并调用门面；命令注册由 `cli/registry.py` 的 `GROUPS` 单一事实来源驱动（`cli/app.py` 用 `_cmd` 装饰器取 help_key、`_show_tip` 自动反查分组）
 - **ui 层**：展示（`Output` 抽象 + 终端渲染），核心层只依赖 `Output` 抽象，可替换为 JSON/GUI/静默实现
 - **core 层**：纯业务逻辑，不依赖 CLI
   - 服务（按业务域分组于 `services/`）：`ssh/`（KeyStore / SSHConfigManager / path）、`git/`（GitRepoService / AuthorService / rewrite）、`storage/`（StateManager / BackupService）、`net/`（SSHTester / UpdateManager）；业务异常 `errors` 留在 `core/` 顶层
@@ -95,7 +98,7 @@ SSHManager/
 
 ```mermaid
 flowchart LR
-    A[用户输入] --> B[cli/cli.py  Typer]
+    A[用户输入] --> B[cli/app.py  Typer（registry 驱动）]
     B --> D[core/SSHKeyManager]
     D --> E[SSHConfigManager]
     D --> F[StateManager]
@@ -112,18 +115,17 @@ flowchart LR
 flowchart TB
     subgraph User["用户交互层"]
         CLI["CLI 命令行<br/>sshm &lt;command&gt;"]
-        GUI["交互菜单<br/>双击运行 sshm_gui.bat<br/>show_interactive_menu()"]
         LANG["语言层 i18n.py<br/>中英文切换"]
     end
 
     subgraph Cli["CLI 层 (src/sshm/cli/)"]
-        CliApp["cli.py<br/>Typer app<br/>声明式命令定义"]
-        Interactive["interactive.py<br/>交互菜单"]
+        CliApp["app.py<br/>Typer app<br/>registry 驱动命令注册"]
+        Registry["registry.py<br/>命令注册表<br/>GROUPS 单一事实来源"]
     end
 
     subgraph Core["核心业务层 (src/sshm/core/)"]
         Manager["manager.py<br/>SSHKeyManager 门面"]
-        Commands["commands/<br/>keys / repo / author / history / system"]
+        Commands["commands/<br/>keys / repo / author / history / system / config"]
         Services["services/ 服务层<br/>ssh / git / storage / net 按域分组"]
         Updater["net/updater.py<br/>版本更新"]
         Path["ssh/path.py<br/>PATH 管理"]
@@ -132,6 +134,7 @@ flowchart TB
     subgraph UI["展示层 (src/sshm/ui/)"]
         Output["output.py<br/>Output 抽象"]
         Console["console.py<br/>表格/对齐/编码/确认"]
+        Icons["icons.py<br/>语义图标助手"]
     end
 
     subgraph External["外部系统"]
@@ -142,12 +145,10 @@ flowchart TB
     end
 
     CLI --> CliApp
-    GUI --> Interactive
+    CliApp --> Registry
     CLI --> LANG
-    GUI --> LANG
 
     CliApp --> Manager
-    Interactive --> Manager
 
     Manager --> Commands
     Manager --> Services
@@ -189,15 +190,15 @@ pip install -e ".[dev]"     # 安装开发依赖（pytest / basedpyright / pyins
 # 命令行方式
 PYTHONPATH=src python -m sshm key list
 
-# 交互模式
-python src/run_sshm.py
+# 查看顶层帮助（含全部分组）
+PYTHONPATH=src python -m sshm --help
 ```
 
 ---
 
 ## 🧪 测试
 
-基于 pytest 的统一测试套件（`tests/`，75 用例），包含核心业务、CLI 帮助、i18n 一致性守门测试等。
+基于 pytest 的统一测试套件（`tests/`，205+ 用例），包含核心业务、CLI 帮助、i18n 一致性守门测试等。
 
 ```bash
 # 运行全部测试

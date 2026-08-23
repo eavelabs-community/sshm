@@ -3,20 +3,20 @@
 flowchart TB
 
     subgraph User["用户交互层"]
-        CLI["CLI 命令行<br/>sshm &lt;command&gt;<br/>Typer 声明式命令"]
-        GUI["交互菜单<br/>双击运行 sshm_gui.bat<br/>show_interactive_menu()"]
+        CLI["CLI 命令行<br/>sshm &lt;command&gt;"]
         LANG["语言层 i18n.py<br/>组装：翻译函数 + 语言状态"]
         LANG_PKG["language 包<br/>key 模版 + EN/ZH 字典"]
     end
 
     subgraph Cli["CLI 层 (src/sshm/cli/)"]
-        CLIAPP["cli.py<br/>Typer app（24 命令）"]
-        Interactive["interactive.py<br/>交互式 TUI 菜单"]
+        CLIAPP["app.py<br/>Typer app（25 命令）<br/>registry 驱动注册"]
+        Registry["registry.py<br/>命令注册表<br/>GROUPS 单一事实来源"]
+        Suggest["suggest.py<br/>未知命令/用法建议"]
     end
 
     subgraph Core["核心业务层 (src/sshm/core/)"]
         Manager["manager.py<br/>SSHKeyManager 门面"]
-        Commands["commands/<br/>keys / repo / author / history / system"]
+        Commands["commands/<br/>keys / repo / author / history / system / config"]
         Services["services/ 服务层<br/>ssh / git / storage / net 按域分组"]
         Updater["net/updater.py<br/>版本更新"]
         Path["ssh/path.py<br/>PATH 管理"]
@@ -25,6 +25,7 @@ flowchart TB
     subgraph UI["展示层 (src/sshm/ui/)"]
         Output["output.py<br/>Output 抽象"]
         Console["console.py<br/>表格/对齐/编码/确认"]
+        Icons["icons.py<br/>语义图标助手"]
     end
 
     subgraph External["外部系统"]
@@ -36,14 +37,12 @@ flowchart TB
 
     %% 用户层到 CLI / 语言层
     CLI --> CLIAPP
-    GUI --> Interactive
+    CLIAPP --> Registry
     CLI --> LANG
-    GUI --> LANG
     LANG --> LANG_PKG
 
     %% CLI 层到核心层
     CLIAPP --> Manager
-    Interactive --> Manager
 
     %% 门面到命令编排 / 服务 / 展示抽象
     Manager --> Commands

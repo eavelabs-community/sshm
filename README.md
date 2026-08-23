@@ -51,9 +51,8 @@
 | **🔌 仓库集成** | `sshm repo use` 自动识别 Git 仓库并配置专用密钥 | 深度融入开发工作流 |
 | **👤 作者管理** | `sshm author` 管理并自动设置仓库/全局 Git 作者 | 多账号提交信息不乱 |
 | **🌐 国际化** | 内置 i18n，`sshm config language` 切换中英文 | 双语输出体验 |
-| **🔄 自动更新** | 启动静默检查，`sshm config update` 一键升级 | 始终保持最新版本 |
+| **🔄 自动更新** | 启动静默检查，`sshm version update` 一键升级 | 始终保持最新版本 |
 | **💻 跨平台** | Windows / macOS / Linux | 统一一致性体验 |
-| **🖱️ 交互模式** | 双击运行进入 TUI 菜单 | 零命令基础也能使用 |
 
 ---
 
@@ -124,8 +123,8 @@ python -m sshm key list
 
 ```bash
 # 1️⃣ 创建密钥
-sshm key create personal --name "Personal" --email my@email.com
-sshm key create work --name "Work Dev" --email work@company.com
+sshm key create personal my@email.com --name "Personal"
+sshm key create work work@company.com --name "Work Dev"
 
 # 2️⃣ 查看状态
 sshm key list
@@ -163,12 +162,12 @@ sshm 遵循标准且安全的目录结构：
 | 命令 | 说明 |
 | :--- | :--- |
 | `sshm key list [-a]` | 查看所有密钥（`-a` 显示公钥内容） |
-| `sshm key create <标签> [--name ..] [--email ..] [-t 类型] [--bits N]` | 创建新密钥（邮箱可省略，从公钥推断） |
+| `sshm key create <标签> <邮箱> [--name ..] [--host ..] [-t 类型]` | 创建新密钥（`--name` 记录作者名，`--host` 配置 SSH 主机） |
 | `sshm key switch <标签>` | 切换全局默认密钥（默认开启 `auto-author` 时会同步对应作者） |
 | `sshm key current` | 查看当前使用的密钥 |
-| `sshm key rename <旧> <新>` / `sshm key remove <标签>` / `sshm key label` | 重命名 / 删除 / 保存当前默认密钥为标签 |
+| `sshm key rename <旧> <新>` / `sshm key remove <标签>` / `sshm key label <标签>` | 重命名 / 删除 / 保存当前默认密钥为标签 |
 | `sshm repo use <标签> [-p 路径]` | 为 Git 仓库配置专用密钥 |
-| `sshm repo clone <git-url> --key <标签> [目录]` | 用指定密钥克隆仓库，克隆后仓库直接使用该密钥 |
+| `sshm repo clone <标签> <git-url> [目录]` | 用指定密钥克隆仓库，克隆后仓库直接使用该密钥 |
 | `sshm repo info` | 查看当前仓库配置详情 |
 | `sshm repo test [--all]` | 测试 SSH 连接 |
 | `sshm author list / add / update / remove / use / unset` | 管理并应用仓库/全局 Git 作者 |
