@@ -9,6 +9,17 @@
 
 ## [未发布]
 
+### 规划中
+
+- [ ] SSH Agent 管理
+- [ ] 密钥导入/导出
+- [ ] 远程备份与云同步
+- [ ] 团队协作与密钥安全扫描
+
+---
+
+## [0.0.6] - 2026-08-23
+
 ### ✨ 重构与改进
 
 - **重复函数收敛（DRY）**：新建 `ui/icons.py` 集中图标翻译助手（`ok/warn/tip/done/err`），7 个 commands/services/cli 文件的重复转发函数统一改为从 `ui.icons` 导入；新建 `core/utils/fileperms.py`（收敛 `keystore`/`backup` 重复的密钥权限设置）与 `core/utils/parse.py`（收敛 `history`/`cli` 重复的 `OLD:NEW` 解析）；`gitrepo.extract_host_from_url` 收敛 repo/gitrepo 的 `git@` 正则
@@ -20,12 +31,9 @@
 - **错误渲染修复**：`version` 组无子命令时改用 `click.echo`（rich 会把帮助文本的 `[xxx]` 当 markup 误渲染），并补齐退出码 0；`backup` 默认视图的「相关命令」tip 分组关联修复（跨分组重名命令的歧义）
 - **i18n key 精简**：清理交互式 CLI 移除后残留的 29 个未使用 key（`prompt.enter_*`×16、`lbl.*`×11、`cmd.config_update`、`hdr.author_manage`、`prompt.apply_global`），当前 KEYS 共 **405 个**；新增 `lbl.language_zh_name`/`lbl.language_en_name` + `i18n.language_display_name()` 收敛语言名硬编码
 
-### 规划中
+### 📝 文档
 
-- [ ] SSH Agent 管理
-- [ ] 密钥导入/导出
-- [ ] 远程备份与云同步
-- [ ] 团队协作与密钥安全扫描
+- 文档与版本号同步至 v0.0.6（INSTALL / UPDATE 安装示例）
 
 ---
 

@@ -170,7 +170,9 @@ class UpdateManager:
 
     def _match_platform_asset(self, data: dict) -> str | None:
         """从 release assets 中按当前平台关键词模糊匹配可执行资产下载链接。"""
-        keywords = self._PLATFORM_ASSET_KEYWORDS.get(self._detect_platform(), ())
+        # 用 self.platform（可被测试/调用方覆盖），而非重新探测，
+        # 否则单测里 mock 的 platform 属性不生效，CI 在非 Windows 上会用真实平台匹配。
+        keywords = self._PLATFORM_ASSET_KEYWORDS.get(self.platform, ())
         _SOURCE_SUFFIXES = (".tar.gz", ".zip", ".tar.xz")
         for asset in data.get("assets", []):
             name = asset.get("name", "").lower()

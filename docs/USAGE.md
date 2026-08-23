@@ -277,7 +277,7 @@ sshm version update --yes           # 跳过确认直接更新
 
 ```bash
 sshm version reinstall                      # 默认升级到最新版本并覆盖
-sshm version reinstall --version v0.0.5     # 指定版本（回滚 / 修复损坏）
+sshm version reinstall --version v0.0.6     # 指定版本（回滚 / 修复损坏）
 sshm version reinstall --yes --force        # 跳过确认 + 强制检查
 ```
 

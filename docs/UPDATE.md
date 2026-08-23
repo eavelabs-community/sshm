@@ -27,7 +27,7 @@ SSH Manager 内置自动检查更新与一键更新能力，更新相关命令�
    - `sshm version update --force` / `-f`：强制检查，忽略缓存
    - `sshm version update --yes` / `-y`：跳过确认直接更新
    - `sshm version reinstall`：重新安装，默认升级到最新版本（覆盖当前可执行文件）
-   - `sshm version reinstall --version v0.0.5` / `-V v0.0.5`：指定版本重装（修复损坏 / 回滚）
+   - `sshm version reinstall --version v0.0.6` / `-V v0.0.6`：指定版本重装（修复损坏 / 回滚）
    - `sshm version reinstall --force` / `-f`、`--yes` / `-y`：同上含义
 
 3. **版本比较**
@@ -75,7 +75,7 @@ sshm version update --yes           # 跳过确认直接更新
 
 ```bash
 sshm version reinstall              # 默认升级到最新版本并覆盖
-sshm version reinstall --version v0.0.5   # 指定版本（回滚 / 修复损坏）
+sshm version reinstall --version v0.0.6   # 指定版本（回滚 / 修复损坏）
 sshm version reinstall --yes --force      # 跳过确认 + 强制检查
 ```
 
@@ -90,7 +90,7 @@ sshm version reinstall --yes --force      # 跳过确认 + 强制检查
 sshm key list
 
 # 如果有新版本，会在输出前显示提示：
-# 💡 有新版本可用: v0.0.6 (当前: v0.0.5)
+# 💡 有新版本可用: v0.0.7 (当前: v0.0.6)
 #    运行 'sshm version update' 更新到最新版本
 ```
 
