@@ -185,7 +185,7 @@ def _delete_remote_tag(tag: str) -> None:
         print(f"   ℹ️  远端无 tag {tag} 或删除跳过：{proc.stderr.strip()[:80]}")
 
 
-def git_tag(new_ver: str, push: bool) -> None:
+def git_tag(new_ver: str, push: bool, force: bool = False) -> None:
     tag = f"v{new_ver}"
     # 校验当前 git 状态（不应有未提交改动）
     status = run(["git", "status", "--porcelain"], check=False).stdout.strip()
@@ -194,7 +194,23 @@ def git_tag(new_ver: str, push: bool) -> None:
         sys.exit(1)
 
     if _tag_exists(tag):
-        # tag 已存在：询问是否重新打（删除本地 + 远端旧 tag 再打新）
+        if force:
+            # 强制模式：跳过交互询问。若本地 tag 未指向当前 HEAD（如 squash 重写
+            # 历史后），重新打；否则保留。push 时用 --force 覆盖远端同名 tag。
+            head = run(["git", "rev-parse", "HEAD"], check=True).stdout.strip()
+            if run(["git", "rev-parse", f"refs/tags/{tag}"], check=True).stdout.strip() != head:
+                print(f"ℹ️  tag {tag} 未指向当前提交，重打（{_tag_commit(tag)} → HEAD）。")
+                _delete_local_tag(tag)
+                run(["git", "tag", tag], check=True)
+                print(f"✅ 已重打 git tag {tag}")
+            else:
+                print(f"✅ tag {tag} 已指向当前提交，无需重打。")
+            if push:
+                _push_branch()
+                _push_tag(tag, force=True)
+            return
+
+        # 普通模式：tag 已存在，询问是否重新打（删除本地 + 远端旧 tag 再打新）
         print(f"\n⚠️  本地已存在 tag {tag}（指向 {_tag_commit(tag)}）")
         answer = input(f"   是否重新打该 tag（删除本地+远端旧 tag，指向当前提交）？[y/N]: ").strip().lower()
         if answer not in ("y", "yes"):
@@ -215,7 +231,7 @@ def git_tag(new_ver: str, push: bool) -> None:
         # 先推送当前分支（确保远端主干拿到全部提交），再推送 tag 触发 CI，
         # 避免只推 tag 而远端 main 仍落后于本地
         _push_branch()
-        _push_tag(tag)
+        _push_tag(tag, force=force)
 
 
 def _tag_commit(tag: str) -> str:
@@ -238,9 +254,13 @@ def _push_branch() -> None:
     print(f"✅ 已推送分支 {branch} 到远端")
 
 
-def _push_tag(tag: str) -> None:
-    run(["git", "push", "origin", tag], check=True)
-    print(f"✅ 已推送 tag {tag}（触发 CI 构建发版）")
+def _push_tag(tag: str, force: bool = False) -> None:
+    cmd = ["git", "push", "origin", tag]
+    if force:
+        # 强制覆盖远端同名 tag（squash 重写历史后，远端 tag 仍指向旧 commit）
+        cmd.insert(2, "--force")
+    run(cmd, check=True)
+    print(f"✅ 已推送 tag {tag}（{'强制 ' if force else ''}触发 CI 构建发版）")
 
 
 def _setup_console() -> None:
@@ -260,6 +280,12 @@ def main() -> None:
     parser.add_argument("version", help="目标版本号，如 0.0.6")
     parser.add_argument("--tag", action="store_true", help="修改文件后打 git tag")
     parser.add_argument("--push", action="store_true", help="修改文件后打 tag 并 push（触发 CI）")
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="强制推送 tag（覆盖远端已存在的同名 tag，用于 squash 重写历史后更新 tag 指向）",
+    )
     args = parser.parse_args()
 
     raw_ver = args.version.strip()
@@ -276,7 +302,7 @@ def main() -> None:
             # 版本已是最新：跳过文件修改，直接打 tag。
             # 用于「上一轮发版只改了文件、未打 tag，现在补打 tag 触发 CI」的场景。
             print(f"ℹ️  版本已是 v{old_ver}，跳过文件修改，直接打 tag。")
-            git_tag(new_ver, push=args.push)
+            git_tag(new_ver, push=args.push, force=args.force)
             return
         fail(f"当前已是版本 {old_ver}，无需发版")
 
@@ -288,7 +314,7 @@ def main() -> None:
 
     print(f"\n📋 发版文件修改完成（v{old_ver} → v{new_ver}）。请审查后提交。")
     if args.tag or args.push:
-        git_tag(new_ver, push=args.push)
+        git_tag(new_ver, push=args.push, force=args.force)
     else:
         print("  提交后如需打 tag 触发 CI：python scripts/release.py <版本> --tag（或 --push）")
 
