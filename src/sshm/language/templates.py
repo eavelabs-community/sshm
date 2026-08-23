@@ -84,6 +84,7 @@ KEYS: tuple[str, ...] = (
     "cmd.repo_test",
     "cmd.repo_use",
     "cmd.version",
+    "cmd.version_add_to_path",
     "cmd.version_update",
     "cmd.version_reinstall",
     "cmd.group_version",

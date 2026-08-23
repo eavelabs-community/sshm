@@ -55,6 +55,7 @@ EN: dict[str, str] = {
     "cmd.config_language": "set the output language",
     "cmd.config_auto_author": "toggle automatic author sync on key switch",
     "cmd.version_update": "check and update to the latest version",
+    "cmd.version_add_to_path": "add the current executable directory to PATH",
     "cmd.version_reinstall": "reinstall sshm (overwrite executable)",
     "cmd.group_key": "manage SSH keys",
     "cmd.group_repo": "manage Git repo key binding",

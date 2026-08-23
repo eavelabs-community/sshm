@@ -695,6 +695,15 @@ def version_default(
         raise typer.Exit(0)
 
 
+@_cmd(version_app, "version", "add-to-path")
+def version_add_to_path() -> None:
+    """将当前可执行文件目录添加到系统 PATH（Windows 注册表 / Unix shell 配置）。"""
+    manager = _manager()
+    code = manager.system.add_to_path()
+    if code is not None:
+        raise typer.Exit(code=code)
+
+
 @_cmd(version_app, "version", "update")
 def version_update(
     check: bool = typer.Option(False, "--check", "-c", help=_(K.opt.check_only)),

@@ -55,6 +55,7 @@ ZH: dict[str, str] = {
     "cmd.config_language": "设置输出语言",
     "cmd.config_auto_author": "切换密钥时自动联动作者信息",
     "cmd.version_update": "检查并更新到最新版本",
+    "cmd.version_add_to_path": "将当前可执行文件目录添加到系统 PATH",
     "cmd.version_reinstall": "重新安装 sshm（覆盖当前可执行文件）",
     "cmd.group_key": "管理 SSH 密钥",
     "cmd.group_repo": "管理仓库密钥绑定",

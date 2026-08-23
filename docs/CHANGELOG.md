@@ -16,7 +16,7 @@
 - **SSH 测试结构化返回**：`SSHTester.test()` 返回 `(ok, msg, user)`，`repo.py` 不再依赖翻译文本匹配用户名（修复中文环境下 `Hi/Welcome` 判断失效）
 - **更新检查错误链路修复**：`UpdateManager` 网络错误抛 `UpdateCheckError`（区别于「无更新」的 `None`），`system.update/reinstall` 捕获并走 `_fail`，不再误报「已是最新」；新增 `upd.check_failed` key
 - **历史重写性能优化**：`rewrite_history` 复用预览阶段导出的字节流，消除「预览 + 实际」双次 `fast-export`；预览改用字节模式导出（避免文本层破坏二进制 data 块）
-- **PATH 配置退出码修正**：`path.add_to_path` 返回 `bool`，命令层据此 `_mark_error`，修复失败/取消时退出码仍为 0
+- **PATH 配置命令入口恢复 + 退出码修正**：`path.add_to_path` 返回 `bool`，命令层据此 `_mark_error`（修复失败/取消时退出码仍为 0）；新增 `sshm version add-to-path` 命令（交互模式移除后该功能一度失去 CLI 入口，现恢复）
 - **错误渲染修复**：`version` 组无子命令时改用 `click.echo`（rich 会把帮助文本的 `[xxx]` 当 markup 误渲染），并补齐退出码 0；`backup` 默认视图的「相关命令」tip 分组关联修复（跨分组重名命令的歧义）
 - **i18n key 精简**：清理交互式 CLI 移除后残留的 29 个未使用 key（`prompt.enter_*`×16、`lbl.*`×11、`cmd.config_update`、`hdr.author_manage`、`prompt.apply_global`），当前 KEYS 共 **405 个**；新增 `lbl.language_zh_name`/`lbl.language_en_name` + `i18n.language_display_name()` 收敛语言名硬编码
 

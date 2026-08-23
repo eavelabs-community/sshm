@@ -71,6 +71,7 @@ GROUPS: dict[str, list[CommandMeta]] = {
         CommandMeta("auto-author", K.cmd.config_auto_author, "config"),
     ],
     "version": [
+        CommandMeta("add-to-path", K.cmd.version_add_to_path, "version"),
         CommandMeta("update", K.cmd.version_update, "version"),
         CommandMeta("reinstall", K.cmd.version_reinstall, "version"),
     ],
