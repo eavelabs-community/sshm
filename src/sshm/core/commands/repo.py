@@ -139,13 +139,13 @@ class RepoCommands:
 
         except subprocess.CalledProcessError as e:
             if "No such remote" in str(e.stderr):
-                self.m._fail(_(K.msg.no_origin_remote), hint=_(K.msg.add_remote_first))
+                self.m._fail("NO_ORIGIN_REMOTE")
             else:
-                self.m._fail(_(K.err.git_failed, err=e))
+                self.m._fail("GIT_FAILED", err=e)
         except subprocess.TimeoutExpired:
-            self.m._fail(_(K.msg.ssh_test_timed_out), icon=ICON_WARN)
+            self.m._fail("SSH_TEST_TIMEOUT")
         except Exception as e:
-            self.m._fail(f"{_(K.misc.error)}: {e}")
+            self.m._fail("GIT_FAILED", err=e)
 
     def clone(
         self,
@@ -158,9 +158,7 @@ class RepoCommands:
         # 校验标签存在密钥
         key_type = self.m.keystore.detect_key_type_for_label(label)
         if not key_type:
-            msg = _(K.err.key_not_found_short, label=label)
-            self.m._fail(msg)
-            print("   " + _(K.msg.use_all_keys_tip))
+            self.m._fail("KEY_NOT_FOUND_SHORT", label=label)
             return
 
         # 解析 URL
@@ -311,7 +309,7 @@ class RepoCommands:
             else:
                 self.m._fail(_(K.err.git_failed, err=e))
         except Exception as e:
-            self.m._fail(f"{_(K.misc.error)}: {e}")
+            self.m._fail("GIT_FAILED", err=e)
 
     def test(
         self,
@@ -458,4 +456,4 @@ class RepoCommands:
                 else:
                     self.m._fail(_(K.err.git_failed, err=e))
             except Exception as e:
-                self.m._fail(f"{_(K.misc.error)}: {e}")
+                self.m._fail("GIT_FAILED", err=e)

@@ -88,10 +88,21 @@ class ErrorSpec:
 # --------------------------------------------------------------------------
 ERROR_REGISTRY: dict[str, ErrorSpec] = {
     "KEY_NOT_FOUND": ErrorSpec("KEY_NOT_FOUND", "err.key_not_found", "msg.use_all_keys_tip"),
+    "KEY_NOT_FOUND_SHORT": ErrorSpec("KEY_NOT_FOUND_SHORT", "err.key_not_found_short", "msg.use_all_keys_tip"),
     "AUTHOR_DUP_ID": ErrorSpec("AUTHOR_DUP_ID", "err.author_dup_identity", "err.author_dup_hint"),
     "REWRITE_USAGE": ErrorSpec("REWRITE_USAGE", "err.author_exclusive", "err.rewrite_usage_tip"),
+    "NEED_OLD": ErrorSpec("NEED_OLD", "err.need_old", "err.rewrite_usage_tip"),
+    "NEED_NEW": ErrorSpec("NEED_NEW", "err.need_new", "err.rewrite_usage_tip"),
     "NOT_GIT_REPO": ErrorSpec("NOT_GIT_REPO", "err.not_git_repo", None),
     "NO_KEYS": ErrorSpec("NO_KEYS", "err.no_keys", "msg.use_all_keys_tip"),
+    "NO_ORIGIN_REMOTE": ErrorSpec("NO_ORIGIN_REMOTE", "msg.no_origin_remote", "msg.add_remote_first"),
+    "GIT_FAILED": ErrorSpec("GIT_FAILED", "err.git_failed", None),
+    "SSH_TEST_TIMEOUT": ErrorSpec("SSH_TEST_TIMEOUT", "msg.ssh_test_timed_out", None, warn=True),
+    "NO_RECOVERABLE": ErrorSpec("NO_RECOVERABLE", "err.no_recoverable", None),
+    "OPERATION_CANCELLED": ErrorSpec("OPERATION_CANCELLED", "err.operation_cancelled", None),
+    "INVALID_BACKUP_NAME": ErrorSpec("INVALID_BACKUP_NAME", "err.invalid_backup_name", None),
+    "BACKUP_NOT_FOUND_PATH": ErrorSpec("BACKUP_NOT_FOUND_PATH", "err.backup_not_found_path", "err.use_backups_cmd"),
+    "RESTORE_FAILED_DETAIL": ErrorSpec("RESTORE_FAILED_DETAIL", "err.restore_failed_detail", None),
 }
 
 

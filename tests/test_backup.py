@@ -36,12 +36,17 @@ def service(backup_env):
     from sshm.core.services.storage.backup import BackupService
 
     errors = []
+
+    def reporter(code, **params):
+        # 适配错误码体系：error_reporter 需接收 (code, **params)
+        errors.append((code, params))
+
     svc = BackupService(
         backup_env["ssh_dir"],
         backup_env["backup_dir"],
         backup_env["state_file"],
         backup_env["config_file"],
-        error_reporter=errors.append,
+        error_reporter=reporter,
     )
     svc._errors = errors
     return svc

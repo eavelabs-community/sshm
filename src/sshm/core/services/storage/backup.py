@@ -40,7 +40,7 @@ class BackupService:
         backup_dir: Path,
         state_file: Path,
         config_file: Path,
-        error_reporter: Callable[[str], None],
+        error_reporter: Callable[..., None],
     ):
         self.ssh_dir = ssh_dir
         self.backup_dir = backup_dir
@@ -113,12 +113,11 @@ class BackupService:
             # 校验备份名，防止路径穿越 / 绝对路径 / 家目录逃逸出备份目录
             candidate = Path(backup_name)
             if candidate.is_absolute() or ".." in candidate.parts or str(backup_name).startswith("~"):
-                self._error(f"❌ {_(K.err.invalid_backup_name, name=backup_name)}")
+                self._error("INVALID_BACKUP_NAME", name=backup_name)
                 return
             backup_path = self.backup_dir / backup_name
             if not backup_path.exists():
-                self._error(f"❌ {_(K.err.backup_not_found)} {backup_path}")
-                print("   " + _(K.err.use_backups_cmd))
+                self._error("BACKUP_NOT_FOUND_PATH", path=backup_path)
                 return
         else:
             backups = sorted(
@@ -138,7 +137,7 @@ class BackupService:
             files = [f for f in files if f.name.startswith(f"id_{key_type}")]
 
         if not files:
-            self._error("❌ " + _(K.err.no_recoverable))
+            self._error("NO_RECOVERABLE")
             return
 
         print("\n📂 " + _(K.msg.will_restore_count, count=len(files)))
@@ -146,7 +145,7 @@ class BackupService:
             print(f"   - {f.name}")
 
         if not skip_confirm and not confirm("\n" + _(K.msg.restore_prompt)):
-            self._error("❌ " + _(K.misc.operation_cancelled))
+            self._error("OPERATION_CANCELLED")
             return
 
         restored = []
@@ -158,7 +157,7 @@ class BackupService:
                 _secure_key_perms(target, private=not f.name.endswith(".pub"))
                 restored.append(f.name)
             except OSError as e:
-                self._error(f"❌ {_(K.err.restore_failed)} {f.name} ({e})")
+                self._error("RESTORE_FAILED_DETAIL", name=f.name, detail=e)
         # 恢复状态文件（包含 active_keys / authors / hosts 映射）
         state_backup = backup_path / STATE_FILE_NAME
         if state_backup.exists():

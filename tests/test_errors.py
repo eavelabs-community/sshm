@@ -83,3 +83,53 @@ def test_manager_fail_raw_msg_still_works(capsys):
     out = capsys.readouterr().out
     assert "plain message" in out
     assert "do something" in out
+
+
+def test_manager_fail_with_param_and_default_hint(capsys):
+    """_fail 错误码带参数 + 注册表默认 hint 自动注入（KEY_NOT_FOUND_SHORT）。"""
+    m = SSHKeyManager()
+    m._fail("KEY_NOT_FOUND_SHORT", label="eavelabs")
+    out = capsys.readouterr().out
+    assert "eavelabs" in out
+    assert "key list" in out.lower()  # 默认 hint 自动注入
+
+
+def test_resolve_error_warn_renders_warn_flag():
+    """SSH_TEST_TIMEOUT 应为软告警（warn=True）。"""
+    msg, hint, code, warn = resolve_error(SSHMError("SSH_TEST_TIMEOUT"))
+    assert warn is True
+    assert "timed out" in msg.lower()
+
+
+def test_registry_codes_resolve_without_error():
+    """所有已登记错误码都能被 resolve_error 正常组装（参数齐全）。"""
+    from sshm.core.errors import ERROR_REGISTRY
+    from sshm.i18n import _
+
+    print("DBG REG KEYS:", [k for k in ERROR_REGISTRY if "BACKUP" in k])
+
+    samples = {
+        "KEY_NOT_FOUND": {"label": "x"},
+        "KEY_NOT_FOUND_SHORT": {"label": "x"},
+        "AUTHOR_DUP_ID": {"name": "n", "email": "e", "label": "l"},
+        "REWRITE_USAGE": {},
+        "NEED_OLD": {},
+        "NEED_NEW": {},
+        "NOT_GIT_REPO": {"path": "/p"},
+        "NO_KEYS": {},
+        "NO_ORIGIN_REMOTE": {},
+        "GIT_FAILED": {"err": "boom"},
+        "SSH_TEST_TIMEOUT": {},
+        "NO_RECOVERABLE": {},
+        "OPERATION_CANCELLED": {},
+        "INVALID_BACKUP_NAME": {"name": "x"},
+        "BACKUP_NOT_FOUND_PATH": {"path": "/p"},
+        "RESTORE_FAILED_DETAIL": {"name": "k", "detail": "e"},
+    }
+    for code, params in samples.items():
+        msg, hint, c, w = resolve_error(SSHMError(code, **params))
+        assert msg, f"{code} 消息为空"
+        # 确认没有未填充的占位符残留
+        assert "{" not in msg, f"{code} 消息仍有未填充占位符: {msg}"
+        if hint:
+            assert "{" not in hint, f"{code} hint 仍有未填充占位符: {hint}"

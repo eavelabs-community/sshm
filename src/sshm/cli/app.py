@@ -555,17 +555,17 @@ def history_rewrite(
     full_email = bool(new_email and not old_email)
     full_author = bool(author)
     if precise and (full_author or full_name or full_email):
-        manager._fail(_(K.err.author_exclusive), hint=_(K.err.rewrite_usage_tip))
+        manager._fail("REWRITE_USAGE")
         raise SystemExit(1)
     if full_author and (full_name or full_email):
-        manager._fail(_(K.err.author_exclusive), hint=_(K.err.rewrite_usage_tip))
+        manager._fail("REWRITE_USAGE")
         raise SystemExit(1)
     if not (full_author or full_name or full_email):
         if not old_name and not old_email:
-            manager._fail(_(K.err.need_old), hint=_(K.err.rewrite_usage_tip))
+            manager._fail("NEED_OLD")
             raise SystemExit(1)
         if not new_name and not new_email:
-            manager._fail(_(K.err.need_new), hint=_(K.err.rewrite_usage_tip))
+            manager._fail("NEED_NEW")
             raise SystemExit(1)
     # —— 结束参数校验 ——
     manager.history.rewrite(path, name, email, author, yes)

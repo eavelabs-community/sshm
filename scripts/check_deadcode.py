@@ -88,6 +88,18 @@ def find_unused_i18n_keys(keys: list[str]) -> list[str]:
                 if isinstance(cur, ast.Name) and cur.id == "K":
                     # 反转 parts 得到 'cmd.xxx'（K.cmd.xxx -> ['xxx','cmd']）
                     used_keys.add(".".join(reversed(parts)))
+            # 3. 错误码体系：ErrorSpec(code, msg_key, hint_key, ...) 的参数字符串
+            #    i18n key 通过 ERROR_REGISTRY 间接引用，需显式识别，否则会被误判为未使用。
+            if isinstance(node, ast.Call):
+                func_name = ""
+                if isinstance(node.func, ast.Name):
+                    func_name = node.func.id
+                elif isinstance(node.func, ast.Attribute):
+                    func_name = node.func.attr
+                if func_name == "ErrorSpec":
+                    for arg in node.args:
+                        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                            used_keys.add(arg.value)
     return [k for k in keys if k not in used_keys]
 
 
