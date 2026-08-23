@@ -194,6 +194,14 @@ def _validate(name, out, err, code, should_succeed):
     elif not should_succeed:
         if "❌" not in combined:
             problems.append("错误场景缺少统一 ❌ 错误标记")
+        else:
+            # 反裸 ❌：错误场景走统一渲染时必须带 💡 引导提示，
+            # 否则用户不知道下一步该怎么做（如查看可用 label / --help）。
+            # 用户主动取消（cancelled/取消）属于合法无引导，放行。
+            has_hint = "💡" in combined
+            is_cancel = ("cancelled" in combined.lower()) or ("取消" in combined)
+            if not has_hint and not is_cancel:
+                problems.append("错误场景有 ❌ 但缺少统一 💡 引导提示（裸报错）")
     return (len(problems) == 0, problems)
 
 

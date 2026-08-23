@@ -400,6 +400,7 @@ ZH: dict[str, str] = {
     "err.no_keys": "未找到任何密钥",
     "err.no_author_set": "没有可设置的作者信息",
     "err.author_exclusive": "--author 不能与 --name/--email 同时使用",
+    "err.rewrite_usage_tip": "使用 'sshm history rewrite --help' 查看用法",
     "err.author_not_found": "未找到已保存的作者: {label}",
     "err.use_author_list": "使用 'sshm author list' 查看已保存的作者",
     "err.no_authors": "暂无已保存的作者",

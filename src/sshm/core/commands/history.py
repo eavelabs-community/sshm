@@ -91,11 +91,11 @@ class HistoryCommands:
 
         # 互斥校验：精细替换不能与任何全量刷新混用
         if precise and (full_author or full_name or full_email):
-            self.m._fail(_(K.err.author_exclusive))
+            self.m._fail(_(K.err.author_exclusive), hint=_(K.err.rewrite_usage_tip))
             return
         # --author 不能与 --name/--email 单值全量混用
         if full_author and (full_name or full_email):
-            self.m._fail(_(K.err.author_exclusive))
+            self.m._fail(_(K.err.author_exclusive), hint=_(K.err.rewrite_usage_tip))
             return
 
         if author:
@@ -119,7 +119,7 @@ class HistoryCommands:
         else:
             match_all = False
             if not old_name and not old_email:
-                self.m._fail(_(K.err.need_old))
+                self.m._fail(_(K.err.need_old), hint=_(K.err.rewrite_usage_tip))
                 return
             if not new_name and not new_email:
                 self.m._fail(_(K.err.need_new))

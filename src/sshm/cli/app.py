@@ -535,8 +535,11 @@ def history_rewrite(
     author: str = typer.Option(None, "--author", "-a", help=_(K.opt.author)),
     yes: bool = typer.Option(False, "--yes", "-y", help=_(K.opt.yes)),
 ):
-    # —— 用法/参数校验（判定与 manager 层一致，前置到 CLI 层以渲染统一 tip
-    #     模板 + 非零退出，取代 manager 层的裸 _fail 输出）——
+    # —— 用法/参数校验（判定与 manager 层一致，前置到 CLI 层）——
+    # 失败时经 manager._fail 渲染统一 ❌ + 💡 引导模板，再用 SystemExit(1) 退出，
+    # 取代 click.UsageError（其默认渲染无 hint，会产生裸 ❌）。
+    manager = _manager()
+
     def _split_pair(v: str | None):
         if not v:
             return None, None
@@ -552,16 +555,19 @@ def history_rewrite(
     full_email = bool(new_email and not old_email)
     full_author = bool(author)
     if precise and (full_author or full_name or full_email):
-        raise click.UsageError(_(K.err.author_exclusive))
+        manager._fail(_(K.err.author_exclusive), hint=_(K.err.rewrite_usage_tip))
+        raise SystemExit(1)
     if full_author and (full_name or full_email):
-        raise click.UsageError(_(K.err.author_exclusive))
+        manager._fail(_(K.err.author_exclusive), hint=_(K.err.rewrite_usage_tip))
+        raise SystemExit(1)
     if not (full_author or full_name or full_email):
         if not old_name and not old_email:
-            raise click.UsageError(_(K.err.need_old))
+            manager._fail(_(K.err.need_old), hint=_(K.err.rewrite_usage_tip))
+            raise SystemExit(1)
         if not new_name and not new_email:
-            raise click.UsageError(_(K.err.need_new))
+            manager._fail(_(K.err.need_new), hint=_(K.err.rewrite_usage_tip))
+            raise SystemExit(1)
     # —— 结束参数校验 ——
-    manager = _manager()
     manager.history.rewrite(path, name, email, author, yes)
     _fail_exit(manager)
     _show_tip("history", "rewrite")

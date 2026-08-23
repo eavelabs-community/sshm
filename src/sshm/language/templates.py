@@ -418,6 +418,7 @@ KEYS: tuple[str, ...] = (
     "err.no_keys",
     "err.no_author_set",
     "err.author_exclusive",
+    "err.rewrite_usage_tip",
     "err.author_not_found",
     "err.author_dup_identity",
     "err.author_dup_hint",

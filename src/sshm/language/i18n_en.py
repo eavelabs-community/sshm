@@ -400,6 +400,7 @@ EN: dict[str, str] = {
     "err.no_keys": "No keys found",
     "err.no_author_set": "No author info available to set",
     "err.author_exclusive": "--author cannot be combined with --name/--email",
+    "err.rewrite_usage_tip": "Use 'sshm history rewrite --help' for usage",
     "err.author_not_found": "Saved author not found: {label}",
     "err.use_author_list": "Use 'sshm author list' to view saved authors",
     "err.no_authors": "No saved authors yet",
