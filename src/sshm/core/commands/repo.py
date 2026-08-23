@@ -106,10 +106,10 @@ class RepoCommands:
 
             # 先测试 SSH 连接，再更新 URL，避免留下无法认证的坏配置
             print("🧪 " + _(K.msg.testing_ssh))
-            test_ok, test_msg = self.m.tester.test(host_alias)
+            test_ok, test_msg, user = self.m.tester.test(host_alias)
             if test_ok:
                 print(_ok(K.msg.ssh_test_passed))
-                if "Hi" in test_msg or "Welcome" in test_msg:
+                if user:
                     print(f"   {test_msg}")
             else:
                 print(_warn(K.msg.ssh_test_failed))
@@ -394,7 +394,7 @@ class RepoCommands:
 
             print("\n🧪 " + _(K.msg.testing))
 
-            success, message = self.m.tester.test(host_alias)
+            success, message, _user = self.m.tester.test(host_alias)
             if success:
                 print(f"{ICON_OK} {message}")
             else:
@@ -419,7 +419,7 @@ class RepoCommands:
                 if host_alias:
                     print(f"\n🧪 {_(K.msg.testing_host, host=host_alias)}")
 
-                    success, message = self.m.tester.test(host_alias)
+                    success, message, _user = self.m.tester.test(host_alias)
                     if success:
                         print(f"{ICON_OK} {message}")
                     else:

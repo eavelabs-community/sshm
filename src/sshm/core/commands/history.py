@@ -12,7 +12,6 @@ import subprocess
 from pathlib import Path
 
 from ..utils.parse import split_pair
-from ..utils.process import git
 from typing import TYPE_CHECKING
 
 from ...i18n import _
@@ -156,14 +155,17 @@ class HistoryCommands:
         # 用 dry-run 预估（fast-export 到临时流，不导入）。
         # 显式传活跃 refs（排除 refs/original/ 备份），避免 matched 计数
         # 反复命中已重写过的旧历史。
+        original = b""
         try:
-            from ..services.git.rewrite import _active_refs, _count_matches
+            from ..services.git.rewrite import _active_refs, _count_matches, _run_git
 
             active = _active_refs(repo_path)
             # 用原始字节导出（仓库历史可能含二进制 blob，文本模式 errors="replace"
             # 会改坏 data 块字节数；这里只用于统计，同样必须按字节）。
-            export = git(repo_path, "fast-export", *active)
-            matched = _count_matches(export.stdout, cfg)
+            export = _run_git(repo_path, ["fast-export"] + active, binary_output=True)
+            if export.returncode == 0:
+                original = export.stdout or b""
+                matched = _count_matches(original, cfg)
         except Exception:
             matched = 0
         if matched == 0:
@@ -181,7 +183,8 @@ class HistoryCommands:
 
         try:
             with output_status(_(K.msg.rewriting)):
-                result = rewrite_history(repo_path, cfg)
+                # 复用预览导出的字节流，避免「预览 + 实际」重复 fast-export 完整历史
+                result = rewrite_history(repo_path, cfg, original=original)
         except Exception as e:
             self.m._fail(ErrCode.REWRITE_FAILED, err=e)
             return

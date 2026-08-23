@@ -175,6 +175,8 @@ KEYS: tuple[str, ...] = (
     "lbl.key_info",
     "lbl.key_type",
     "lbl.label",
+    "lbl.language_en_name",
+    "lbl.language_zh_name",
     "lbl.modified",
     "lbl.name",
     "lbl.new_remote_url",
@@ -409,6 +411,7 @@ KEYS: tuple[str, ...] = (
     # ---- upd. 更新模块 ----
     "upd.available",
     "upd.cancelled",
+    "upd.check_failed",
     "upd.checking",
     "upd.complete",
     "upd.downloading",

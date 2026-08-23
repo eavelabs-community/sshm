@@ -49,17 +49,18 @@ _SSH_FAILURE_MARKERS = (
 
 
 class SSHTester:
-    """SSH 连接测试器：只负责单次连接探测，返回 (是否成功, 说明)。"""
+    """SSH 连接测试器：只负责单次连接探测，返回 (是否成功, 说明, 用户名)。"""
 
     # 识别 "Hi <user>!" 形式的认证欢迎语，用于提取用户名
     _HI_RE = re.compile(r"Hi ([^!]+)!", re.IGNORECASE)
     _WELCOME_RE = re.compile(r"Welcome to [^,]+, (@?[\w.-]+)")
 
-    def test(self, host: str) -> tuple[bool, str]:
+    def test(self, host: str) -> tuple[bool, str, str | None]:
         """测试 SSH 连接（兼容 GitHub/GitLab/Bitbucket/自建 Git 平台）
 
         Returns:
-            (True, 成功说明) 或 (False, 失败说明)
+            (是否成功, 说明文本, 提取到的用户名或 None)。
+            用户名是结构化字段，调用方勿依赖翻译文本反解，避免中文环境下失效。
         """
         try:
             result = run_checked(
@@ -80,26 +81,26 @@ class SSHTester:
 
             # 1) 失败关键词优先（失败通常比成功更明确）
             if any(m in low for m in _SSH_FAILURE_MARKERS):
-                return (False, _(K.err.connection_failed, detail=output.strip()[:100]))
+                return (False, _(K.err.connection_failed, detail=output.strip()[:100]), None)
 
             # 2) 成功关键词 / 欢迎语
             if any(m in low for m in _SSH_SUCCESS_MARKERS):
                 user = self._extract_user(output)
                 if user:
-                    return (True, _(K.msg.auth_success, user=user))
-                return (True, _(K.msg.connected))
+                    return (True, _(K.msg.auth_success, user=user), user)
+                return (True, _(K.msg.connected), None)
 
             # 3) 未知平台文案：以退出码兜底
             if result.returncode == 0:
-                return (True, _(K.msg.connected))
-            return (False, _(K.err.connection_failed, detail=output.strip()[:100]))
+                return (True, _(K.msg.connected), None)
+            return (False, _(K.err.connection_failed, detail=output.strip()[:100]), None)
 
         except subprocess.TimeoutExpired:
-            return (False, _(K.err.connection_timeout))
+            return (False, _(K.err.connection_timeout), None)
         except FileNotFoundError:
-            return (False, _(K.err.ssh_not_found))
+            return (False, _(K.err.ssh_not_found), None)
         except Exception as e:
-            return (False, f"{_(K.misc.error)}: {e!s}")
+            return (False, f"{_(K.misc.error)}: {e!s}", None)
 
     def _extract_user(self, output: str) -> str | None:
         """从输出中提取认证用户名（"Hi <user>!" / "Welcome to ..., <user>"）"""

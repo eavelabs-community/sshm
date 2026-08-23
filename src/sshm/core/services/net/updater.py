@@ -23,6 +23,14 @@ from ....ui.output import ICON_WARN, print, progress
 from ....ui.tip import render_business_error
 
 
+class UpdateCheckError(Exception):
+    """更新检查失败（网络错误 / API 异常）。
+
+    与「无更新」（正常返回 None）区分，供调用方把网络错误上报为失败，
+    避免把网络故障误报为「已是最新」。
+    """
+
+
 class UpdateManager:
     """更新管理器"""
 
@@ -153,11 +161,12 @@ class UpdateManager:
 
             return result
 
-        except URLError:
-            # 网络错误，静默失败
-            return None
-        except Exception:
-            return None
+        except URLError as e:
+            # 网络错误：抛出以区分「无更新」，避免调用方误报「已是最新」
+            raise UpdateCheckError(f"{type(e).__name__}: {e}") from e
+        except (OSError, ValueError) as e:
+            # 请求被取消 / API 返回非法 JSON 等
+            raise UpdateCheckError(f"{type(e).__name__}: {e}") from e
 
     def _match_platform_asset(self, data: dict) -> str | None:
         """从 release assets 中按当前平台关键词模糊匹配可执行资产下载链接。"""
@@ -204,10 +213,11 @@ class UpdateManager:
             with urlopen(req, timeout=10) as response:
                 data = json.loads(response.read().decode("utf-8"))
             return self._build_release_info(data)
-        except URLError:
-            return None
-        except Exception:
-            return None
+        except URLError as e:
+            # 网络错误：抛出以区分「版本不存在」，避免调用方误报「未找到该版本」
+            raise UpdateCheckError(f"{type(e).__name__}: {e}") from e
+        except (OSError, ValueError) as e:
+            raise UpdateCheckError(f"{type(e).__name__}: {e}") from e
 
     def download_and_update(self, download_url: str) -> bool:
         """

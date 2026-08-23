@@ -156,11 +156,16 @@ class TestCheckUpdate:
         assert result is not None
         assert result["download_url"] == "https://x/win.exe"
 
-    def test_network_error_returns_none(self, updater):
+    def test_network_error_raises(self, updater):
         from urllib.error import URLError
 
+        from sshm.core.services.net.updater import UpdateCheckError
+
+        # 网络错误应抛出 UpdateCheckError（区别于「无更新」的 None），
+        # 供调用方把网络故障上报为失败，而非误报「已是最新」。
         with patch("sshm.core.services.net.updater.urlopen", side_effect=URLError("offline")):
-            assert updater.check_update(force=True) is None
+            with pytest.raises(UpdateCheckError):
+                updater.check_update(force=True)
 
     def test_saves_cache_after_check(self, updater):
         updater.current_version = "v0.0.1"

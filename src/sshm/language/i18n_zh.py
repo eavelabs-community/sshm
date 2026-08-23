@@ -130,6 +130,8 @@ ZH: dict[str, str] = {
     "hdr.test_results": "测试结果汇总:",
     # ---- 表格/字段标签 (lbl) ----
     "lbl.label": "标签",
+    "lbl.language_en_name": "英文",
+    "lbl.language_zh_name": "中文",
     "lbl.file": "文件",
     "lbl.modified": "修改时间",
     "lbl.alias": "别名",
@@ -380,6 +382,7 @@ ZH: dict[str, str] = {
     "sys.run_to_apply": "执行以下命令使环境变量生效：",
     "sys.or_restart": "或重启终端",
     # ---- 更新模块 (upd) ----
+    "upd.check_failed": "检查更新失败: {detail}",
     "upd.checking": "正在检查更新...",
     "upd.up_to_date": "已是最新版本！",
     "upd.new_version": "发现新版本: {version}",

@@ -27,12 +27,11 @@ class ConfigCommands:
 
     def show(self) -> None:
         """显示当前系统配置总览（语言 + 自动作者联动开关）。"""
-        from ...i18n import get_lang
+        from ...i18n import get_lang, language_display_name
 
         lang = get_lang()
-        name = "Chinese" if lang == "zh" else "English"
         print_section_header(_(K.hdr.auto_author))
-        print(f"   {_(K.lbl.current_language)} {name} ({lang})")
+        print(f"   {_(K.lbl.current_language)} {language_display_name(lang)} ({lang})")
 
         auto_author = self.m.state_manager.read_auto_author()
         status = _(K.misc.on) if auto_author else _(K.misc.off)

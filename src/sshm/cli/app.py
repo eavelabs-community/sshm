@@ -21,7 +21,7 @@ import typer
 from ..constants import SUPPORTED_KEY_TYPES
 from ..core import SSHKeyManager
 from ..core.utils.parse import split_pair
-from ..i18n import _, get_lang
+from ..i18n import _, get_lang, language_display_name
 from ..language import LANGUAGES, K
 from ..ui.console import format_timestamp
 from ..ui.output import print
@@ -616,8 +616,7 @@ def config_lang(
     manager = _manager()
     if lang is None:
         cur = get_lang()
-        name = "Chinese" if cur == "zh" else "English"
-        print(_(K.lbl.current_language) + f" {name} ({cur})")
+        print(_(K.lbl.current_language) + f" {language_display_name(cur)} ({cur})")
         print(_(K.lbl.available_languages))
         _show_tip("config", "language")
         return
@@ -652,8 +651,12 @@ def version_default(
 ) -> None:
     """未指定子命令时，显示版本组帮助（等价于 sshm version -h）。"""
     if ctx.invoked_subcommand is None:
-        # 直接打印 group 帮助，避免触发 UsageError 被全局异常处理器渲染为 ❌
-        print(ctx.get_help())
+        # 用 click.echo 原样输出帮助（rich 会把 [xxx] 当 markup 误渲染），
+        # 且显式退出码 0，避免触发 UsageError 被全局异常处理器渲染为 ❌
+        import click
+
+        click.echo(ctx.get_help())
+        raise typer.Exit(0)
 
 
 @version_app.command("update", help=_(K.cmd.version_update))
@@ -717,4 +720,4 @@ def main_callback(
         is_eager=True,
     ),
 ) -> None:
-    """sshm - Multi-account Git SSH key management tool"""
+    """sshm 顶层入口。帮助文案由 app.help（K.cmd.app_help）提供，此处不重复。"""

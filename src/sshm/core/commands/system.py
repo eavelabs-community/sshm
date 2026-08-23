@@ -47,7 +47,7 @@ class SystemCommands:
         Returns:
             退出码（0 成功 / 1 失败）；无需退出（已最新 / 仅检查 / 取消）返回 None
         """
-        from ..services.net.updater import UpdateManager
+        from ..services.net.updater import UpdateCheckError, UpdateManager
 
         updater = UpdateManager()
         print_separator()
@@ -57,7 +57,11 @@ class SystemCommands:
         print(f"{_(K.lbl.platform)} {updater.platform}")
 
         print("\n" + _(K.upd.checking))
-        update_info = updater.check_update(force=force)
+        try:
+            update_info = updater.check_update(force=force)
+        except UpdateCheckError as e:
+            self.m._fail(_(K.upd.check_failed, detail=str(e)))
+            return 1
 
         if not update_info:
             print(_ok(K.upd.up_to_date))
@@ -79,7 +83,7 @@ class SystemCommands:
         Returns:
             退出码（0 成功 / 1 失败）；无匹配资产 / 取消时返回 None
         """
-        from ..services.net.updater import UpdateManager
+        from ..services.net.updater import UpdateCheckError, UpdateManager
 
         updater = UpdateManager()
         print_separator()
@@ -88,22 +92,26 @@ class SystemCommands:
         print(f"\n{_(K.lbl.current_version)} v{updater.current_version}")
         print(f"{_(K.lbl.platform)} {updater.platform}")
 
-        if target_version:
-            print("\n" + _(K.upd.reinstall_checking, version=target_version))
-            update_info = updater.get_release_by_tag(target_version)
-            if not update_info:
-                self.m._fail(_(K.upd.reinstall_not_found, version=target_version))
-                return None
-            # 指定版本即目标，无需再比较新旧
-            return self._apply_update(updater, update_info, check=False, yes=yes, reinstall=True)
-        else:
-            # 不指定版本：重装当前版本（强制覆盖），不判断新旧
-            print("\n" + _(K.upd.reinstall_checking, version=f"v{updater.current_version}"))
-            update_info = updater.get_release_by_tag(f"v{updater.current_version}")
-            if not update_info:
-                self.m._fail(_(K.upd.reinstall_not_found, version=f"v{updater.current_version}"))
-                return None
-            return self._apply_update(updater, update_info, check=False, yes=yes, reinstall=True)
+        try:
+            if target_version:
+                print("\n" + _(K.upd.reinstall_checking, version=target_version))
+                update_info = updater.get_release_by_tag(target_version)
+                if not update_info:
+                    self.m._fail(_(K.upd.reinstall_not_found, version=target_version))
+                    return None
+                # 指定版本即目标，无需再比较新旧
+                return self._apply_update(updater, update_info, check=False, yes=yes, reinstall=True)
+            else:
+                # 不指定版本：重装当前版本（强制覆盖），不判断新旧
+                print("\n" + _(K.upd.reinstall_checking, version=f"v{updater.current_version}"))
+                update_info = updater.get_release_by_tag(f"v{updater.current_version}")
+                if not update_info:
+                    self.m._fail(_(K.upd.reinstall_not_found, version=f"v{updater.current_version}"))
+                    return None
+                return self._apply_update(updater, update_info, check=False, yes=yes, reinstall=True)
+        except UpdateCheckError as e:
+            self.m._fail(_(K.upd.check_failed, detail=str(e)))
+            return 1
 
     def _apply_update(
         self,

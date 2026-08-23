@@ -327,12 +327,19 @@ def _current_branch_name(repo: Path) -> str:
     return ""
 
 
-def rewrite_history(repo_path: Path, cfg: RewriteConfig) -> dict:
+def rewrite_history(repo_path: Path, cfg: RewriteConfig, *, original: bytes | None = None) -> dict:
     """重写指定仓库的历史作者/邮箱。
 
-    返回统计信息 dict：
-        matched_commits: 匹配到旧作者/邮箱的提交数（预览阶段）
-        rewritten: 实际重写的行数
+    Args:
+        repo_path: 仓库路径
+        cfg: 重写规则
+        original: 可选，已用 fast-export 导出的原始字节流。命令层预览已导出
+            一次，可传入复用，避免「预览 + 实际」重复导出完整历史。
+
+    Returns:
+        统计信息 dict：
+            matched_commits: 匹配到旧作者/邮箱的提交数
+            rewritten: 实际重写的行数
     """
     if cfg.match_all:
         # 全量刷新：无需 old 条件，但必须指定 new_name 或 new_email
@@ -350,12 +357,14 @@ def rewrite_history(repo_path: Path, cfg: RewriteConfig) -> dict:
     active = _active_refs(repo)
     if not active:
         return {"matched_commits": 0, "rewritten": 0}
-    export = _run_git(repo, ["fast-export"] + active, binary_output=True)
-    if export.returncode != 0:
-        raise RuntimeError(f"git fast-export failed: {export.stderr.decode('utf-8', 'replace').strip()}")
-    original = export.stdout
+    if original is None:
+        export = _run_git(repo, ["fast-export"] + active, binary_output=True)
+        if export.returncode != 0:
+            raise RuntimeError(f"git fast-export failed: {export.stderr.decode('utf-8', 'replace').strip()}")
+        original = export.stdout or b""
+    stream: bytes = original
 
-    matched = _count_matches(original, cfg)
+    matched = _count_matches(stream, cfg)
     if matched == 0:
         return {"matched_commits": 0, "rewritten": 0}
 
@@ -363,7 +372,7 @@ def rewrite_history(repo_path: Path, cfg: RewriteConfig) -> dict:
     _backup_refs(repo)
 
     # 3. 字节级重写流（data 块原样保留，author/committer 替换）
-    new_stream, replaced = _rewrite_stream(original, cfg)
+    new_stream, replaced = _rewrite_stream(stream, cfg)
 
     # 4. 导入重写后的流（原始 bytes stdin，绝不经过文本层）
     imp = _run_git(repo, ["fast-import", "--quiet", "--force"], input_bytes=new_stream)

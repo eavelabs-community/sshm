@@ -23,6 +23,7 @@ __all__ = [
     "done",
     "err",
     "get_lang",
+    "language_display_name",
     "load_from_state",
     "resolve_lang",
     "set_lang",
@@ -44,6 +45,18 @@ def set_lang(lang: str) -> None:
 def get_lang() -> str:
     """获取当前语言"""
     return _current_lang
+
+
+def language_display_name(lang: str) -> str:
+    """返回语言的本地化显示名（如 zh → '中文'，en → 'English'）。
+
+    收敛 config/version 展示里硬编码的 "Chinese"/"English" 语言名。
+    用 K.* 常量访问，便于守门工具识别 key 被使用。
+    """
+    from .language import K
+
+    key = K.lbl.language_zh_name if lang == "zh" else K.lbl.language_en_name
+    return _(key)
 
 
 # --------------------------------------------------------------------------

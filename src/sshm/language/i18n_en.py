@@ -130,6 +130,8 @@ EN: dict[str, str] = {
     "hdr.test_results": "Test Results Summary:",
     # ---- 表格/字段标签 (lbl) ----
     "lbl.label": "Label",
+    "lbl.language_en_name": "English",
+    "lbl.language_zh_name": "Chinese",
     "lbl.file": "File",
     "lbl.modified": "Modified",
     "lbl.alias": "Alias",
@@ -380,6 +382,7 @@ EN: dict[str, str] = {
     "sys.run_to_apply": "Run the following to apply:",
     "sys.or_restart": "or restart your terminal",
     # ---- 更新模块 (upd) ----
+    "upd.check_failed": "Failed to check for updates: {detail}",
     "upd.checking": "Checking for updates...",
     "upd.up_to_date": "You are up to date!",
     "upd.new_version": "New version found: {version}",
