@@ -73,16 +73,43 @@ def parse_registry() -> dict[str, list[tuple[str, str]]]:
     return groups
 
 
-def parse_show_tip_calls() -> list[tuple[str, str]]:
-    """解析 app.py 里所有 _show_tip("group", "name") 调用。"""
+def parse_show_tip_calls() -> list[tuple[str | None, str]]:
+    """解析 app.py 里所有 _show_tip 调用。
+
+    返回 [(group, name)]：
+    - 命令函数内 `_show_tip()`（无参）：group/name 从该函数的 `_cmd` 装饰器推断；
+    - callback 内 `_show_tip("name")`（单参）：group 为 None，由校验层反查。
+    """
     tree = ast.parse(CLI_PY.read_text(encoding="utf-8"))
-    calls: list[tuple[str, str]] = []
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if node.func.id == "_show_tip" and len(node.args) >= 2:
-                g = ast.literal_eval(node.args[0])
-                n = ast.literal_eval(node.args[1])
-                calls.append((g, n))
+    calls: list[tuple[str | None, str]] = []
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        # 该函数的命令归属：@_cmd(app, "group", "name") 或 @app.command("name")
+        cmd_meta: tuple[str | None, str] | None = None
+        for dec in node.decorator_list:
+            if not isinstance(dec, ast.Call):
+                continue
+            func = dec.func
+            if isinstance(func, ast.Name) and func.id == "_cmd" and len(dec.args) > 2:
+                if isinstance(dec.args[1], ast.Constant) and isinstance(dec.args[2], ast.Constant):
+                    cmd_meta = (dec.args[1].value, dec.args[2].value)
+                break
+        # 遍历函数体内的 _show_tip 调用
+        for sub in ast.walk(node):
+            if (
+                isinstance(sub, ast.Call)
+                and isinstance(sub.func, ast.Name)
+                and sub.func.id == "_show_tip"
+            ):
+                if cmd_meta is not None:
+                    # 命令函数：无参 _show_tip() 或单参 _show_tip("name") 都归属命令自身
+                    if not sub.args or (len(sub.args) == 1 and isinstance(sub.args[0], ast.Constant)):
+                        name = sub.args[0].value if sub.args else cmd_meta[1]
+                        calls.append((cmd_meta[0], name))
+                elif sub.args and len(sub.args) == 1 and isinstance(sub.args[0], ast.Constant):
+                    # callback：_show_tip("name")，group 待校验层反查
+                    calls.append((None, sub.args[0].value))
     return calls
 
 
@@ -134,21 +161,30 @@ def parse_cli() -> dict[tuple[str, str], list[str]]:
         for dec in node.decorator_list:
             if not isinstance(dec, ast.Call):
                 continue
-            # 匹配 @xxx_app.command("name") 或 @xxx_app.callback(...)
             func = dec.func
+            group = name = None
             if isinstance(func, ast.Attribute) and func.attr in ("command", "callback"):
+                # 旧式：@xxx_app.command("name") / @xxx_app.callback(...)
                 if isinstance(func.value, ast.Name) and func.value.id in app_to_group:
                     group = app_to_group[func.value.id]
-                    name = None
                     if dec.args and isinstance(dec.args[0], ast.Constant):
                         name = dec.args[0].value
-                    # callback（invoke_without_command）没有子命令名，跳过命令校验
                     if func.attr == "callback":
-                        continue
-                    # 提取函数体内 manager.<group>.<method> 调用
-                    methods = _extract_manager_calls(node)
-                    result[(group, name)] = methods
-                    break
+                        continue  # callback 无子命令名，跳过命令校验
+            elif isinstance(func, ast.Name) and func.id == "_cmd":
+                # 新式：@_cmd(xxx_app, "group", "name")，group 从 xxx_app 或第二参解析
+                if dec.args and isinstance(dec.args[0], ast.Name) and dec.args[0].id in app_to_group:
+                    group = app_to_group[dec.args[0].id]
+                if len(dec.args) > 1 and isinstance(dec.args[1], ast.Constant):
+                    # 显式分组（当前用法 _cmd(app, group, name) 的 group 参数）
+                    group = dec.args[1].value
+                if len(dec.args) > 2 and isinstance(dec.args[2], ast.Constant):
+                    name = dec.args[2].value
+            if name and group:
+                # 提取函数体内 manager.<group>.<method> 调用
+                methods = _extract_manager_calls(node)
+                result[(group, name)] = methods
+                break
     return result
 
 
@@ -247,9 +283,14 @@ def main() -> int:
         if help_key != expected:
             problems.append(f"[help-key] {group} {name} help_key='{help_key}', expected '{expected}'")
 
-    # 6. _show_tip(group, current) 与命令所属分组/命令名一致
+    # 6. _show_tip 与命令所属分组/命令名一致
     for g, n in tip_calls:
-        if (g, n) not in registry_commands:
+        if g is None:
+            # callback 内 _show_tip("name")：反查 name 对应的注册命令
+            match = next((gc for gc in registry_commands if gc[1] == n), None)
+            if match is None:
+                problems.append(f"[tip] _show_tip('{n}') has no matching registered command")
+        elif (g, n) not in registry_commands:
             problems.append(f"[tip] _show_tip('{g}', '{n}') has no matching registered command")
 
     # 7. help_key 引用的 i18n key 必须存在

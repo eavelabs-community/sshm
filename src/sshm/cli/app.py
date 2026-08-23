@@ -25,6 +25,7 @@ from ..i18n import _, get_lang, language_display_name
 from ..language import LANGUAGES, K
 from ..ui.console import format_timestamp
 from ..ui.output import print
+from . import registry as _registry
 from .registry import GROUP_ORDER, related_commands
 from ..core.errors import ErrCode
 
@@ -91,21 +92,59 @@ def _fail_exit(manager: SSHKeyManager) -> None:
         raise SystemExit(1)
 
 
-def _show_tip(group: str, current: str, extra: tuple = ()) -> None:
+def _show_tip(name: str | None = None) -> None:
     """输出"本组相关命令" tip（从注册表推导，dim 淡色突出主次）。
 
     Args:
-        group: 当前命令所在分组（'key' / 'repo' / ...）
-        current: 当前命令名（用于排除自身）
-        extra: 可选，额外追加的跨分组相关命令
+        name: 可选。命令名，用于 callback（如 backup_default）等非 `_cmd`
+            注册的函数；不传时自动从 `_cmd` 装饰器记录的 `__sshm_command__`
+            反查当前命令，避免在调用点手写 group/name（与 registry 重复）。
     """
     from ..ui.tip import related_command_blocks, render_tip_block
 
-    cmds = related_commands(group, current, extra)
+    if name is None:
+        frame = sys._getframe(1)
+        fn = frame.f_globals.get(frame.f_code.co_name)
+        cmd = getattr(fn, "__sshm_command__", None)
+        if not cmd:
+            return
+        group, current = cmd
+    else:
+        # 从命令名反查分组（命令名全局唯一）
+        meta = next(
+            (m for cmds in _registry.GROUPS.values() for m in cmds if m.name == name),
+            None,
+        )
+        if not meta:
+            return
+        group, current = meta.group, name
+    cmds = related_commands(group, current)
     if not cmds:
         return
     for block in related_command_blocks(group, cmds):
         render_tip_block(block, style="dim")
+
+
+def _cmd(app: typer.Typer, group: str, name: str):
+    """按注册表驱动注册 Typer 命令。
+
+    从 registry.GROUPS 取该命令的 help_key（单一事实来源），避免在装饰器里
+    重复写 `K.cmd.xxx`；并把 (group, name) 记录到函数 `__sshm_command__`，
+    供 `_show_tip()` 自动反查，消除 `_show_tip("key", "list")` 的手写重复。
+
+    Args:
+        app: 所属分组的 Typer 子应用（如 key_app）
+        group: 分组名（'key' / 'repo' / ...）
+        name: 命令名（与 registry GROUPS 中一致）
+    """
+    meta = next(m for m in _registry.GROUPS.get(group, []) if m.name == name)
+
+    def deco(fn):
+        fn.__sshm_command__ = (group, name)
+        app.command(name, help=_(meta.help_key))(fn)
+        return fn
+
+    return deco
 
 
 def _print_version_rows(rows) -> None:
@@ -203,7 +242,7 @@ def key_default(
         _fail_exit(manager)
 
 
-@key_app.command("list", help=_(K.cmd.key_list))
+@_cmd(key_app, "key", "list")
 def key_list(
     all: bool = typer.Option(False, "--all", "-a", help=_(K.opt.all)),
     current: bool = typer.Option(False, "--current", "-c", help=_(K.opt.current)),
@@ -212,10 +251,10 @@ def key_list(
     manager = _manager()
     manager.key.list(show_content=all, repo_path=path, current_only=current)
     _fail_exit(manager)
-    _show_tip("key", "list")
+    _show_tip()
 
 
-@key_app.command("create", help=_(K.cmd.key_create))
+@_cmd(key_app, "key", "create")
 def key_create(
     label: str = typer.Argument(..., help=_(K.opt.label)),
     email: str = typer.Argument(..., help=_(K.opt.email)),
@@ -226,10 +265,10 @@ def key_create(
     manager = _manager()
     manager.key.create(label, email, type.value, host, name)
     _fail_exit(manager)
-    _show_tip("key", "create")
+    _show_tip()
 
 
-@key_app.command("remove", help=_(K.cmd.key_remove))
+@_cmd(key_app, "key", "remove")
 def key_remove(
     label: str = typer.Argument(..., help=_(K.opt.label)),
     type: KeyType | None = typer.Option(None, "--type", "-t", help=_(K.opt.type_all)),
@@ -237,10 +276,10 @@ def key_remove(
     manager = _manager()
     manager.key.remove(label, type.value if type else None)
     _fail_exit(manager)
-    _show_tip("key", "remove")
+    _show_tip()
 
 
-@key_app.command("rename", help=_(K.cmd.key_rename))
+@_cmd(key_app, "key", "rename")
 def key_rename(
     old_label: str = typer.Argument(..., help=_(K.opt.old_label)),
     new_label: str = typer.Argument(..., help=_(K.opt.new_label_name)),
@@ -249,10 +288,10 @@ def key_rename(
     manager = _manager()
     manager.key.rename(old_label, new_label, type.value)
     _fail_exit(manager)
-    _show_tip("key", "rename")
+    _show_tip()
 
 
-@key_app.command("label", help=_(K.cmd.key_label))
+@_cmd(key_app, "key", "label")
 def key_label(
     label: str = typer.Argument(..., help=_(K.opt.new_label)),
     type: KeyType | None = typer.Option(None, "--type", "-t", help=_(K.opt.type_auto)),
@@ -261,10 +300,10 @@ def key_label(
     manager = _manager()
     manager.key.label(type.value if type else None, label, switch)
     _fail_exit(manager)
-    _show_tip("key", "label")
+    _show_tip()
 
 
-@key_app.command("switch", help=_(K.cmd.key_switch))
+@_cmd(key_app, "key", "switch")
 def key_switch(
     label: str = typer.Argument(..., help=_(K.opt.label)),
     type: KeyType | None = typer.Option(None, "--type", "-t", help=_(K.opt.type_auto)),
@@ -272,17 +311,17 @@ def key_switch(
     manager = _manager()
     manager.key.switch(label, type.value if type else None)
     _fail_exit(manager)
-    _show_tip("key", "switch")
+    _show_tip()
 
 
-@key_app.command("current", help=_(K.cmd.key_current))
+@_cmd(key_app, "key", "current")
 def key_current(
     path: Path = typer.Option(Path("."), "--path", "-p", help=_(K.opt.path)),
 ):
     manager = _manager()
     manager.key.current(path)
     _fail_exit(manager)
-    _show_tip("key", "current")
+    _show_tip()
 
 
 # ===========================================================================
@@ -308,7 +347,7 @@ def repo_default(
         _fail_exit(manager)
 
 
-@repo_app.command("use", help=_(K.cmd.repo_use))
+@_cmd(repo_app, "repo", "use")
 def repo_use(
     label: str = typer.Argument(..., help=_(K.opt.label)),
     path: Path = typer.Option(Path("."), "--path", "-p", help=_(K.opt.path)),
@@ -328,10 +367,10 @@ def repo_use(
             print()
             manager.author.use(label, path, skip_confirm=yes)
     _fail_exit(manager)
-    _show_tip("repo", "use")
+    _show_tip()
 
 
-@repo_app.command("clone", help=_(K.cmd.repo_clone))
+@_cmd(repo_app, "repo", "clone")
 def repo_clone(
     label: str = typer.Argument(..., help=_(K.opt.clone_label)),
     url: str = typer.Argument(..., help=_(K.opt.url)),
@@ -341,20 +380,20 @@ def repo_clone(
     manager = _manager()
     manager.repo.clone(label, url, target, yes)
     _fail_exit(manager)
-    _show_tip("repo", "clone")
+    _show_tip()
 
 
-@repo_app.command("info", help=_(K.cmd.repo_info))
+@_cmd(repo_app, "repo", "info")
 def repo_info(
     path: Path = typer.Option(Path("."), "--path", "-p", help=_(K.opt.path)),
 ):
     manager = _manager()
     manager.repo.info(path)
     _fail_exit(manager)
-    _show_tip("repo", "info")
+    _show_tip()
 
 
-@repo_app.command("test", help=_(K.cmd.repo_test))
+@_cmd(repo_app, "repo", "test")
 def repo_test(
     label: str = typer.Argument(None, help=_(K.opt.test_label)),
     path: Path = typer.Option(Path("."), "--path", "-p", help=_(K.opt.path)),
@@ -363,7 +402,7 @@ def repo_test(
     manager = _manager()
     manager.repo.test(label, all, path)
     _fail_exit(manager)
-    _show_tip("repo", "test")
+    _show_tip()
 
 
 # ===========================================================================
@@ -386,26 +425,26 @@ def backup_default(
         manager = _manager()
         manager.backup.list()
         _fail_exit(manager)
-        _show_tip("backup", "list")
+        _show_tip("list")
 
 
-@backup_app.command("create", help=_(K.cmd.backup_create))
+@_cmd(backup_app, "backup", "create")
 def backup_create() -> None:
     manager = _manager()
     manager.backup.create()
     _fail_exit(manager)
-    _show_tip("backup", "create")
+    _show_tip()
 
 
-@backup_app.command("list", help=_(K.cmd.backup_list))
+@_cmd(backup_app, "backup", "list")
 def backup_list() -> None:
     manager = _manager()
     manager.backup.list()
     _fail_exit(manager)
-    _show_tip("backup", "list")
+    _show_tip()
 
 
-@backup_app.command("restore", help=_(K.cmd.backup_restore))
+@_cmd(backup_app, "backup", "restore")
 def backup_restore(
     backup: str = typer.Argument(None, help=_(K.opt.backup_name)),
     type: KeyType | None = typer.Option(None, "--type", "-t", help=_(K.opt.type_only)),
@@ -414,7 +453,7 @@ def backup_restore(
     manager = _manager()
     manager.backup.restore(backup, type.value if type else None, yes)
     _fail_exit(manager)
-    _show_tip("backup", "restore")
+    _show_tip()
 
 
 # ===========================================================================
@@ -440,15 +479,15 @@ def author_default(
         _fail_exit(manager)
 
 
-@author_app.command("list", help=_(K.cmd.author_list))
+@_cmd(author_app, "author", "list")
 def author_list() -> None:
     manager = _manager()
     manager.author.list()
     _fail_exit(manager)
-    _show_tip("author", "list")
+    _show_tip()
 
 
-@author_app.command("add", help=_(K.cmd.author_add))
+@_cmd(author_app, "author", "add")
 def author_add(
     label: str = typer.Argument(..., help=_(K.opt.author_label)),
     name: str = typer.Option(None, "--name", "-n", help=_(K.opt.author_name)),
@@ -457,10 +496,10 @@ def author_add(
     manager = _manager()
     manager.author.add(label, name, email)
     _fail_exit(manager)
-    _show_tip("author", "add")
+    _show_tip()
 
 
-@author_app.command("update", help=_(K.cmd.author_update))
+@_cmd(author_app, "author", "update")
 def author_update(
     label: str = typer.Argument(..., help=_(K.opt.author_label)),
     name: str = typer.Option(None, "--name", "-n", help=_(K.opt.author_name)),
@@ -472,10 +511,10 @@ def author_update(
     manager = _manager()
     manager.author.update(label, name, email)
     _fail_exit(manager)
-    _show_tip("author", "update")
+    _show_tip()
 
 
-@author_app.command("remove", help=_(K.cmd.author_remove))
+@_cmd(author_app, "author", "remove")
 def author_remove(
     label: str = typer.Argument(..., help=_(K.opt.author_label)),
     yes: bool = typer.Option(False, "--yes", "-y", help=_(K.opt.yes)),
@@ -483,10 +522,10 @@ def author_remove(
     manager = _manager()
     manager.author.remove(label, yes)
     _fail_exit(manager)
-    _show_tip("author", "remove")
+    _show_tip()
 
 
-@author_app.command("use", help=_(K.cmd.author_use))
+@_cmd(author_app, "author", "use")
 def author_use(
     label: str = typer.Argument(..., help=_(K.opt.author_label)),
     path: Path = typer.Option(Path("."), "--path", "-p", help=_(K.opt.path)),
@@ -499,10 +538,10 @@ def author_use(
     scope = "global" if global_ else "local"
     manager.author.use(label, path, name, email, scope, yes)
     _fail_exit(manager)
-    _show_tip("author", "use")
+    _show_tip()
 
 
-@author_app.command("unset", help=_(K.cmd.author_unset))
+@_cmd(author_app, "author", "unset")
 def author_unset(
     path: Path = typer.Option(Path("."), "--path", "-p", help=_(K.opt.path)),
     global_: bool = typer.Option(False, "--global", "-g", help=_(K.opt.clear_global)),
@@ -511,7 +550,7 @@ def author_unset(
     scope = "global" if global_ else "local"
     manager.author.unset(path, scope)
     _fail_exit(manager)
-    _show_tip("author", "unset")
+    _show_tip()
 
 
 # ===========================================================================
@@ -535,7 +574,7 @@ def history_default(ctx: typer.Context) -> None:
         raise typer.Exit(0)
 
 
-@history_app.command("rewrite", help=_(K.cmd.history_rewrite))
+@_cmd(history_app, "history", "rewrite")
 def history_rewrite(
     path: Path = typer.Option(Path("."), "--path", "-p", help=_(K.opt.path)),
     name: str = typer.Option(None, "--name", "-n", help=_(K.opt.name_arg)),
@@ -570,7 +609,7 @@ def history_rewrite(
     # —— 结束参数校验 ——
     manager.history.rewrite(path, name, email, author, yes)
     _fail_exit(manager)
-    _show_tip("history", "rewrite")
+    _show_tip()
 
 
 # ===========================================================================
@@ -596,7 +635,7 @@ def config_default(
         _fail_exit(manager)
 
 
-@config_app.command("auto-author", help=_(K.cmd.config_auto_author))
+@_cmd(config_app, "config", "auto-author")
 def config_auto_author(
     on: OnOff | None = typer.Argument(None, help=_(K.opt.on_off), metavar="on|off"),
 ):
@@ -606,10 +645,10 @@ def config_auto_author(
     else:
         manager.author.auto_author(on == OnOff.on)
     _fail_exit(manager)
-    _show_tip("config", "auto-author")
+    _show_tip()
 
 
-@config_app.command("language", help=_(K.cmd.config_language))
+@_cmd(config_app, "config", "language")
 def config_lang(
     lang: Lang | None = typer.Argument(None, help=_(K.opt.lang_value), metavar="en|zh"),
 ):
@@ -618,7 +657,7 @@ def config_lang(
         cur = get_lang()
         print(_(K.lbl.current_language) + f" {language_display_name(cur)} ({cur})")
         print(_(K.lbl.available_languages))
-        _show_tip("config", "language")
+        _show_tip()
         return
     lang_value = lang.value
     manager.config.language(lang_value)
@@ -627,7 +666,7 @@ def config_lang(
     else:
         print(_(K.msg.lang_en))
     _fail_exit(manager)
-    _show_tip("config", "language")
+    _show_tip()
 
 
 # ===========================================================================
@@ -659,7 +698,7 @@ def version_default(
         raise typer.Exit(0)
 
 
-@version_app.command("update", help=_(K.cmd.version_update))
+@_cmd(version_app, "version", "update")
 def version_update(
     check: bool = typer.Option(False, "--check", "-c", help=_(K.opt.check_only)),
     force: bool = typer.Option(False, "--force", "-f", help=_(K.opt.force_check)),
@@ -672,7 +711,7 @@ def version_update(
         raise typer.Exit(code=code)
 
 
-@version_app.command("reinstall", help=_(K.cmd.version_reinstall))
+@_cmd(version_app, "version", "reinstall")
 def version_reinstall(
     target_version: str = typer.Option(
         None,
