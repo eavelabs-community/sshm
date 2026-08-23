@@ -213,8 +213,8 @@ _RAW_SPECS: dict[ErrCode, ErrorSpec] = {
     ErrCode.FAILED_PARSE: ErrorSpec(ErrCode.FAILED_PARSE, "err.failed_parse", None),
     ErrCode.GIT_FAILED: ErrorSpec(ErrCode.GIT_FAILED, "err.git_failed", None),
     ErrCode.CLONE_FAILED: ErrorSpec(ErrCode.CLONE_FAILED, "err.clone_failed", None),
-    ErrCode.NO_ORIGIN_REMOTE: ErrorSpec(ErrCode.NO_ORIGIN_REMOTE, "msg.no_origin_remote", "msg.add_remote_first"),
-    ErrCode.SSH_TEST_TIMEOUT: ErrorSpec(ErrCode.SSH_TEST_TIMEOUT, "msg.ssh_test_timed_out", None, warn=True),
+    ErrCode.NO_ORIGIN_REMOTE: ErrorSpec(ErrCode.NO_ORIGIN_REMOTE, "err.no_origin_remote", "err.add_remote_first"),
+    ErrCode.SSH_TEST_TIMEOUT: ErrorSpec(ErrCode.SSH_TEST_TIMEOUT, "err.ssh_test_timed_out", None, warn=True),
     # --- 备份 ---
     ErrCode.NO_BACKUPS_RESTORE: ErrorSpec(ErrCode.NO_BACKUPS_RESTORE, "err.no_backups_restore", None),
     ErrCode.USE_BACKUP_CMD: ErrorSpec(ErrCode.USE_BACKUP_CMD, "err.use_backup_cmd", None),
