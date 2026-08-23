@@ -87,12 +87,14 @@ def main() -> None:
         # 未知命令）抛出来，统一走 suggest.render_usage_error 渲染，取代原生面板
         app(standalone_mode=False)
     except SSHMError as e:
-        # 业务错误统一走 rich 输出（与正常命令一致的首行空行 + ❌ 错误行）
-        from .ui.output import print as _print
+        # 业务错误统一走全局异常解析器组装 ❌/⚠️ + 💡 模板（与 _fail 渲染一致）
+        from .core.errors import resolve_error
+        from .ui.output import ICON_ERR, ICON_WARN, print as _print
+        from .ui.tip import render_business_error
 
-        _print()
-        _print(f"❌ {e}")
-        raise SystemExit(e.exit_code)
+        msg, hint, code, warn = resolve_error(e)
+        render_business_error(msg, icon=ICON_WARN if warn else ICON_ERR, hint=hint)
+        raise SystemExit(code)
     except (click.UsageError, _TyperUsageError) as e:
         # 用法错误（缺参数/非法枚举/未知选项/未知命令等）：统一模板渲染。
         # typer 0.27 起用法错误为 typer._click.exceptions.*，需与 click.UsageError

@@ -11,6 +11,8 @@ SSH 密钥管理器 - 门面（Facade）
 
 from pathlib import Path
 
+from sshm.i18n import _
+
 from ..constants import (
     BACKUP_DIR_NAME,
     DEFAULT_SSH_DIR,
@@ -92,17 +94,32 @@ class SSHKeyManager:
         self.keystore.ensure_directories()
         self.backup_dir.mkdir(mode=0o700, exist_ok=True)
 
-    def _fail(self, msg: str, *, icon: str = ICON_ERR, hint: str | None = None):
+    def _fail(self, msg_or_code, *, icon: str = ICON_ERR, hint: str | None = None, **params):
         """记录业务失败并渲染统一错误（不抛异常，保持原有控制流）。
 
-        Args:
-            msg: 错误消息（不含图标前缀，调用点只传纯消息）。
-            icon: 状态图标，默认 ❌（硬错误）；软告警传 ⚠️。
-            hint: 可选建议行，渲染为 💡 tip 段。
+        支持两种调用形式（与 SSHMError 对齐，逐步迁移到错误码）：
+        1. 错误码：_fail("KEY_NOT_FOUND", label="x")
+           - 从 ERROR_REGISTRY 解析 msg_key + 默认 hint_key，自动 i18n + 格式化；
+           - 默认 hint 自动注入，调用点无需手写 hint 字符串。
+        2. 纯消息（遗留兼容）：_fail("some message", hint=...)
+           - 直接走 render_business_error，行为与旧版一致。
 
-        由 CLI 层在命令结束后检查 `_had_error` 决定退出码。
-        统一走 `ui.tip.render_business_error`，避免各调用点自行拼 `❌` 与格式化。
+        Args:
+            msg_or_code: 错误消息（不含图标前缀）或 ERROR_REGISTRY 中的错误码。
+            icon: 状态图标，默认 ❌（硬错误）；软告警传 ⚠️。错误码形式为 False 时忽略。
+            hint: 可选建议行，覆盖错误码默认值。
+            **params: 错误码消息模板所需的格式化参数。
         """
+        from .errors import ERROR_REGISTRY
+
+        if isinstance(msg_or_code, str) and msg_or_code in ERROR_REGISTRY:
+            spec = ERROR_REGISTRY[msg_or_code]
+            msg = _(spec.msg_key).format(**params)
+            hint = hint or (_(spec.hint_key).format(**params) if spec.hint_key else None)
+            icon = ICON_WARN if spec.warn else ICON_ERR
+        else:
+            msg = msg_or_code  # 兼容纯消息
+
         self._had_error = True
         render_business_error(msg, icon=icon, hint=hint)
 
