@@ -149,7 +149,7 @@ class AuthorService:
             if author.get("email"):
                 git(repo, "config", f"--{scope}", "user.email", author["email"])
         except (subprocess.CalledProcessError, OSError) as e:
-            self._fail(_(K.err.auto_author_failed, err=e), icon=ICON_WARN)
+            self._fail("AUTO_AUTHOR_FAILED", err=e, icon=ICON_WARN)
             return
 
         print(f"{_(K.msg.auto_set_author, label=label)}: {author.get('name', '') or ''} <{author.get('email', '') or ''}>")

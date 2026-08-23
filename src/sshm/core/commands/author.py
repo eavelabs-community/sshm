@@ -64,7 +64,7 @@ class AuthorCommands:
         repo_path = Path(repo_path).resolve()
 
         if not (repo_path / ".git").exists():
-            self.m._fail(_(K.err.not_git_repo, path=repo_path))
+            self.m._fail("NOT_GIT_REPO", path=repo_path)
             print("   " + _(K.err.run_in_repo))
             return
 
@@ -109,7 +109,7 @@ class AuthorCommands:
         repo_path = Path(repo_path).resolve()
 
         if scope != "global" and not (repo_path / ".git").exists():
-            self.m._fail(_(K.err.not_git_repo, path=repo_path))
+            self.m._fail("NOT_GIT_REPO", path=repo_path)
             print("   " + _(K.err.run_in_repo))
             return
 
@@ -182,11 +182,11 @@ class AuthorCommands:
             else:
                 unchanged.append(f"user.email = {current_email or _(K.misc.not_set)}")
         except subprocess.CalledProcessError as e:
-            self.m._fail(_(K.err.git_failed, err=e))
+            self.m._fail("GIT_FAILED", err=e)
             return
 
         if not changed:
-            self.m._fail(_(K.err.no_author_set), icon=ICON_WARN)
+            self.m._fail("NO_AUTHOR_SET", icon=ICON_WARN)
             return
 
         print(f"\n✅ {_(K.msg.set_scope, scope=scope_name)}")
@@ -203,7 +203,7 @@ class AuthorCommands:
         repo_path = Path(repo_path).resolve()
 
         if not (repo_path / ".git").exists():
-            self.m._fail(_(K.err.not_git_repo, path=repo_path))
+            self.m._fail("NOT_GIT_REPO", path=repo_path)
             print("   " + _(K.err.run_in_repo))
             return
 
@@ -300,7 +300,7 @@ class AuthorCommands:
         label_lower = label.lower()
         authors = self.m.state_manager.read_authors()
         if label_lower not in authors:
-            self.m._fail(_(K.err.author_not_found, label=label), hint=_(K.err.use_author_list))
+            self.m._fail("AUTHOR_NOT_FOUND", label=label, hint=_(K.err.use_author_list))
             return
 
         if not name and not email:
@@ -416,7 +416,7 @@ class AuthorCommands:
         label_lower = label.lower()
         authors = self.m.state_manager.read_authors()
         if label_lower not in authors:
-            self.m._fail(_(K.err.author_not_found, label=label), hint=_(K.err.use_author_list))
+            self.m._fail("AUTHOR_NOT_FOUND", label=label, hint=_(K.err.use_author_list))
             return
 
         not_set = _(K.misc.not_set)

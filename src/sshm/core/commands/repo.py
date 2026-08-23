@@ -51,8 +51,7 @@ class RepoCommands:
         repo_path = Path(repo_path).resolve()
 
         if not (repo_path / ".git").exists():
-            self.m._fail(_(K.err.not_git_repo, path=repo_path))
-            print("   " + _(K.err.run_in_repo))
+            self.m._fail("NOT_GIT_REPO", path=repo_path)
             return
 
         key_type = self.m.keystore.detect_key_type_for_label(label)
@@ -78,7 +77,7 @@ class RepoCommands:
 
             parsed = self.m.gitrepo.parse_git_url(current_url)
             if not parsed:
-                self.m._fail(_(K.err.failed_parse))
+                self.m._fail("FAILED_PARSE")
                 return
 
             platform, user, repo = parsed
@@ -164,7 +163,7 @@ class RepoCommands:
         # 解析 URL
         parsed = self.m.gitrepo.parse_git_url(url)
         if not parsed:
-            self.m._fail(_(K.err.failed_parse))
+            self.m._fail("FAILED_PARSE")
             return
         _platform, user, repo = parsed
         repo_name = repo.rstrip(".git") or repo
@@ -201,7 +200,7 @@ class RepoCommands:
             subprocess.run(clone_args, check=True)
         except subprocess.CalledProcessError as e:
             detail = (e.stderr or b"").decode("utf-8", "replace").strip() or str(e)
-            self.m._fail(_(K.err.clone_failed, err=detail))
+            self.m._fail("CLONE_FAILED", err=detail)
             return
 
         # 克隆完成后定位仓库目录（用于后续 author 设置）
@@ -231,7 +230,7 @@ class RepoCommands:
         repo_path = Path(repo_path).resolve()
 
         if not (repo_path / ".git").exists():
-            self.m._fail(_(K.err.not_valid_git, path=repo_path))
+            self.m._fail("NOT_VALID_GIT", path=repo_path)
             return
 
         print(f"{_(K.lbl.repo_path)} {repo_path}")
@@ -307,7 +306,7 @@ class RepoCommands:
             if "No such remote" in str(e.stderr):
                 print("\n⚠️  " + _(K.msg.no_origin_configured))
             else:
-                self.m._fail(_(K.err.git_failed, err=e))
+                self.m._fail("GIT_FAILED", err=e)
         except Exception as e:
             self.m._fail("GIT_FAILED", err=e)
 
@@ -323,7 +322,7 @@ class RepoCommands:
 
             keys_by_label = self.m.keystore.scan_all_keys()
             if not keys_by_label:
-                self.m._fail(_(K.err.no_keys), hint=_(K.msg.use_all_keys_tip))
+                self.m._fail("NO_KEYS", hint=_(K.msg.use_all_keys_tip))
                 return
 
             results = []
@@ -417,7 +416,7 @@ class RepoCommands:
             repo_path = Path(repo_path).resolve()
 
             if not (repo_path / ".git").exists():
-                self.m._fail(_(K.err.not_valid_git, path=repo_path))
+                self.m._fail("NOT_VALID_GIT", path=repo_path)
                 return
 
             print(f"{_(K.lbl.repo_path)} {repo_path}")
@@ -454,6 +453,6 @@ class RepoCommands:
                 if "No such remote" in str(e.stderr):
                     print("\n⚠️  " + _(K.msg.no_origin_configured))
                 else:
-                    self.m._fail(_(K.err.git_failed, err=e))
+                    self.m._fail("GIT_FAILED", err=e)
             except Exception as e:
                 self.m._fail("GIT_FAILED", err=e)

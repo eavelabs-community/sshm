@@ -59,7 +59,7 @@ class KeyCommands:
         - 不允许保留名称 default / original
         """
         if not label or not label.strip():
-            raise ValidationError(_(K.err.label_empty))
+            raise ValidationError("LABEL_EMPTY")
         label = label.strip()
         if not re.match(r"^[A-Za-z0-9][A-Za-z0-9_-]*$", label):
             raise ValidationError(
@@ -69,7 +69,7 @@ class KeyCommands:
                 )
             )
         if label.lower() in self.m.RESERVED_LABELS:
-            raise ValidationError(_(K.err.label_reserved, label=label))
+            raise ValidationError("LABEL_RESERVED", label=label)
         return True
 
     # ------------------------------------------------------------------
@@ -271,7 +271,7 @@ class KeyCommands:
 
         key_file = private_key_path(self.m.ssh_dir, key_type, label)
         if key_file.exists():
-            raise ValidationError(_(K.err.key_exists, name=key_file.name))
+            raise ValidationError("KEY_EXISTS", name=key_file.name)
 
         print(_(K.msg.creating_key, label=label, key_type=key_type))
         print(f"{_(K.lbl.email_prompt)} {email}")
@@ -313,7 +313,7 @@ class KeyCommands:
                 except OSError:
                     pass
             detail = (e.stderr or b"").decode("utf-8", "replace").strip() or str(e)
-            self.m._fail(_(K.err.create_failed, err=detail))
+            self.m._fail("CREATE_FAILED", err=detail)
         except subprocess.TimeoutExpired:
             # 生成超时（如熵不足）：清理残留并给出明确提示
             for p in (key_file, Path(str(key_file) + ".pub")):
@@ -322,9 +322,9 @@ class KeyCommands:
                         p.unlink()
                 except OSError:
                     pass
-            self.m._fail(_(K.err.keygen_timeout))
+            self.m._fail("KEYGEN_TIMEOUT")
         except Exception as e:
-            self.m._fail(f"{_(K.misc.error)}: {e}")
+            self.m._fail("CREATE_FAILED", err=e)
 
     def remove(self, label: str, key_type: str | None = None):
         """删除密钥"""
@@ -409,7 +409,7 @@ class KeyCommands:
             print(f"💡 {_(K.msg.tip_alias_remote, alias=self.m.gitrepo.get_host_alias(label))}")
             print("   " + _(K.msg.rerun_other_label))
         else:
-            self.m._fail(_(K.err.key_not_found, label=label), icon=ICON_WARN)
+            self.m._fail("KEY_NOT_FOUND", label=label, icon=ICON_WARN)
 
     # ------------------------------------------------------------------
     # 切换 / 打标签 / 重命名
@@ -436,7 +436,7 @@ class KeyCommands:
         target_file = private_key_path(self.m.ssh_dir, key_type)
 
         if not source_file.exists():
-            self.m._fail(_(K.err.key_missing, name=source_file.name))
+            self.m._fail("KEY_MISSING", name=source_file.name)
             return
 
         if target_file.exists():
@@ -472,14 +472,14 @@ class KeyCommands:
         if not key_type:
             key_type = self.m.keystore.detect_default_key_type()
             if not key_type:
-                self.m._fail(_(K.err.no_default_key))
+                self.m._fail("NO_DEFAULT_KEY")
                 return
 
         source_file = private_key_path(self.m.ssh_dir, key_type)
         target_file = private_key_path(self.m.ssh_dir, key_type, new_label)
 
         if not source_file.exists():
-            self.m._fail(_(K.err.default_key_missing, name=source_file.name))
+            self.m._fail("DEFAULT_KEY_MISSING", name=source_file.name)
             return
 
         if target_file.exists():
@@ -531,12 +531,12 @@ class KeyCommands:
         new_label_lower = new_label.lower()
 
         if old_label_lower == "default":
-            self.m._fail(_(K.err.cannot_rename_default))
+            self.m._fail("CANNOT_RENAME_DEFAULT")
             return
 
         self._validate_label(new_label)
         if new_label_lower == old_label_lower:
-            self.m._fail(_(K.err.same_label), icon=ICON_WARN)
+            self.m._fail("SAME_LABEL", icon=ICON_WARN)
             return
 
         # 确定要重命名的密钥类型集合：
@@ -556,7 +556,7 @@ class KeyCommands:
         for t in types_to_rename:
             new_file = private_key_path(self.m.ssh_dir, t, new_label)
             if new_file.exists():
-                self.m._fail(_(K.err.target_exists, new_label=new_label, type=t), icon=ICON_WARN)
+                self.m._fail("TARGET_EXISTS", new_label=new_label, type=t, icon=ICON_WARN)
                 print(f"   {_(K.lbl.file_placeholder)} {new_file.name}")
                 return
 
