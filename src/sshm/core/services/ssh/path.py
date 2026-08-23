@@ -69,7 +69,7 @@ def _add_to_windows_path(exe_dir: Path) -> None:
                 print(_(K.sys.current_path, path=exe_dir_str))
                 print(_(K.sys.existing_path, path=existing_paths[0]))
 
-                if prompt_confirm(_(K.sys.update_path_prompt)):
+                if prompt_confirm(_(K.sys.update_path_prompt), default="y"):
                     # 移除旧路径
                     path_entries = [p for p in path_entries if p not in existing_paths]
                     # 添加新路径到开头
@@ -138,7 +138,7 @@ def _add_to_unix_path(exe_dir: Path) -> None:
     print(_(K.sys.will_add, path=rc_file))
     print(_(K.sys.command, cmd=export_line))
 
-    if prompt_confirm("\n" + _("sys.continue")):
+    if prompt_confirm("\n" + _("sys.continue"), default="y"):
         try:
             with rc_file.open("a", encoding="utf-8") as f:
                 f.write("\n# Added by sshm\n")

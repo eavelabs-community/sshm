@@ -49,7 +49,8 @@ def test_help_command(args, cli_runner):
         ["history", "rewrite"],
         ["config", "language"],
         ["config", "auto-author"],
-        ["config", "update"],
+        ["version", "update"],
+        ["version", "reinstall"],
     ],
 )
 def test_subcommands_help(args, cli_runner):

@@ -1,31 +1,27 @@
 #!/usr/bin/env python3
 """
-国际化 (i18n) 组装模块 - 提供翻译函数与语言状态管理
+i18n - 翻译入口
 
-本模块只负责"组装"：从 language 包导入各语言字典，提供统一的翻译入口。
-翻译字典本身位于 language 包：
-  - language/templates.py  通用 key 模版（权威 key 清单 + 类型）
-  - language/i18n_en.py        English (EN) 具体实现
-  - language/i18n_zh.py        中文 (ZH) 具体实现
-
-设计:
-- 稳定 key（如 'cmd.list' / 'opt.label'）作为翻译键，
-  英文 (EN) 与中文 (ZH) 两套字典均映射到同一 key。
-- 默认语言为英文 (en)，可切换为中文 (zh)
-- 语言优先级: SSHM_LANG 环境变量 > 状态文件 lang 字段 > 默认 en
-- 支持 {placeholder} 占位符格式化
+设计：
+- 稳定 key：所有用户可见文案使用 `K.*` 常量（见 language/keys.py）作为 key，
+  通过 `_()` 查找对应语言文本，禁止在代码中硬编码中文/英文文案。
+- 运行时可变语言：_current_lang 由 set_lang / load_from_state 控制。
+- 语义图标翻译助手（ok/warn/tip/done/err）放在 ui/icons.py，
+  避免 i18n ↔ ui.output 的循环依赖，调用点从 ui.icons 导入。
 """
 
 import os
-
-from .language.i18n_en import EN
-from .language.i18n_zh import ZH
 
 # 重新导出语言字典，便于外部直接访问
 __all__ = [
     "EN",
     "ZH",
     "_",
+    "ok",
+    "warn",
+    "tip",
+    "done",
+    "err",
     "get_lang",
     "load_from_state",
     "resolve_lang",
@@ -84,6 +80,48 @@ def load_from_state(state_lang: str | None) -> None:
 
 
 # --------------------------------------------------------------------------
+# 语义图标翻译助手
+# --------------------------------------------------------------------------
+# 把「图标 + 翻译 key」的拼接提取到一处，调用点不再手写 emoji：
+#   tip(K.suggest.usage)   等价于  f"{ICON_TIP} {_(K.suggest.usage)}"
+#   ok(K.msg.key_created)  等价于  f"{ICON_OK} {_(K.msg.key_created)}"
+# 图标用字面量（与 ui.output 的 ICON_* / _EMOJI_STYLE 字符一致），不 import
+# ui.output，避免 i18n ↔ ui.output 的循环依赖。
+# 注意：错误类消息（ErrCode）的图标由错误类型绑定（_fail(icon=...)），
+#       不在此处处理；动态拼接的已翻译文本（如 confirm_msg）也保持原样。
+
+
+def ok(key: str, **kwargs) -> str:
+    """带 ✅ 的成功消息"""
+    return f"✅ {_(key, **kwargs)}"
+
+
+def warn(key: str, **kwargs) -> str:
+    """带 ⚠️ 的警告/提示消息"""
+    return f"⚠️  {_(key, **kwargs)}"
+
+
+def tip(key: str, **kwargs) -> str:
+    """带 💡 的提示消息"""
+    return f"💡 {_(key, **kwargs)}"
+
+
+def done(key: str, **kwargs) -> str:
+    """带 🎉 的完成消息"""
+    return f"🎉 {_(key, **kwargs)}"
+
+
+def err(key: str, **kwargs) -> str:
+    """带 ❌ 的错误消息"""
+    return f"❌ {_(key, **kwargs)}"
+
+
+import sys as _sys
+
+del _sys
+
+
+# --------------------------------------------------------------------------
 # 翻译函数
 # --------------------------------------------------------------------------
 
@@ -108,3 +146,9 @@ def _(text: str, **kwargs) -> str:
         except (KeyError, IndexError, ValueError):
             pass
     return result
+
+
+# language 字典延后到本文件末尾导入，避免包初始化期间 i18n 加载到一半
+# 就被 language → core → commands → author 链要求 _ok 而陷入循环。
+from .language.i18n_en import EN
+from .language.i18n_zh import ZH

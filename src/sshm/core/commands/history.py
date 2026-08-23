@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+
+from ..utils.parse import split_pair
+from ..utils.process import git
 from typing import TYPE_CHECKING
 
 from ...i18n import _
@@ -43,17 +46,8 @@ class HistoryCommands:
 
     @staticmethod
     def _split_pair(value: str | None):
-        """解析 'OLD:NEW' 或 'NEW' 形式的参数。
-
-        Returns:
-            (old, new)：old 仅在包含 ':' 时非空。
-        """
-        if not value:
-            return None, None
-        if ":" in value:
-            old, _, new = value.partition(":")
-            return (old or None), (new or None)
-        return None, value
+        """解析 'OLD:NEW' 或 'NEW' 形式的参数（委托 core.utils.parse.split_pair）。"""
+        return split_pair(value)
 
     def rewrite(
         self,
@@ -81,8 +75,8 @@ class HistoryCommands:
             self.m._fail(ErrCode.NOT_GIT_REPO, path=repo_path)
             return
 
-        old_name, new_name = self._split_pair(name)
-        old_email, new_email = self._split_pair(email)
+        old_name, new_name = split_pair(name)
+        old_email, new_email = split_pair(email)
 
         # 模式判定
         precise = bool(old_name or old_email)  # 精细替换（OLD:NEW）
@@ -168,10 +162,7 @@ class HistoryCommands:
             active = _active_refs(repo_path)
             # 用原始字节导出（仓库历史可能含二进制 blob，文本模式 errors="replace"
             # 会改坏 data 块字节数；这里只用于统计，同样必须按字节）。
-            export = subprocess.run(
-                ["git", "-C", str(repo_path), "fast-export"] + active,
-                capture_output=True,
-            )
+            export = git(repo_path, "fast-export", *active)
             matched = _count_matches(export.stdout, cfg)
         except Exception:
             matched = 0
@@ -184,7 +175,7 @@ class HistoryCommands:
         rich_print(f"\n⚠️  {_(K.msg.rewrites_history)}")
         rich_print("   " + _(K.msg.force_push))
         if not skip_confirm:
-            if not prompt_confirm(_(K.msg.continue_rewrite)):
+            if not prompt_confirm(_(K.msg.continue_rewrite), default="y"):
                 self.m._fail(_(K.misc.operation_cancelled))
                 return
 

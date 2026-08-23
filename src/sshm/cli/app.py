@@ -20,8 +20,10 @@ import typer
 
 from ..constants import SUPPORTED_KEY_TYPES
 from ..core import SSHKeyManager
+from ..core.utils.parse import split_pair
 from ..i18n import _, get_lang
 from ..language import LANGUAGES, K
+from ..ui.console import format_timestamp
 from ..ui.output import print
 from .registry import GROUP_ORDER, related_commands
 from ..core.errors import ErrCode
@@ -127,27 +129,32 @@ def _print_version_rows(rows) -> None:
         _print(f"{lead}{emoji}  {pad_cell(label, label_w)}{gap}{value}")
 
 
+def _print_version_details() -> None:
+    """渲染详细的版本与环境信息（sshm --version 与 sshm version 共用）。"""
+    frozen = getattr(sys, "frozen", False)
+    mode = _(K.ver.mode_packaged) if frozen else _(K.ver.mode_source)
+    system = platform.system()
+    arch = platform.machine()
+    python_ver = platform.python_version()
+    from ..constants import VERSION
+
+    rows = [
+        ["📦", _(K.ver.version), f"v{VERSION}"],
+        ["🖥️", _(K.ver.platform), f"{system} {arch}"],
+        ["🐍", _(K.ver.python), python_ver],
+        ["⚙️", _(K.ver.mode), mode],
+    ]
+    if frozen:
+        rows.append(["🏷️", _(K.ver.build), _build_source()])
+        btime = _build_time()
+        if btime:
+            rows.append(["🕐", _(K.ver.build_time), btime])
+    _print_version_rows(rows)
+
+
 def _version_callback(value: bool) -> None:
     if value:
-        frozen = getattr(sys, "frozen", False)
-        mode = _(K.ver.mode_packaged) if frozen else _(K.ver.mode_source)
-        system = platform.system()
-        arch = platform.machine()
-        python_ver = platform.python_version()
-        from ..constants import VERSION
-
-        rows = [
-            ["📦", _(K.ver.version), f"v{VERSION}"],
-            ["🖥️", _(K.ver.platform), f"{system} {arch}"],
-            ["🐍", _(K.ver.python), python_ver],
-            ["⚙️", _(K.ver.mode), mode],
-        ]
-        if frozen:
-            rows.append(["🏷️", _(K.ver.build), _build_source()])
-            btime = _build_time()
-            if btime:
-                rows.append(["🕐", _(K.ver.build_time), btime])
-        _print_version_rows(rows)
+        _print_version_details()
         raise typer.Exit()
 
 
@@ -164,11 +171,11 @@ def _build_source() -> str:
 def _build_time() -> str:
     """返回 exe 的构建时间（exe 文件修改时间戳）。"""
     try:
+        import os
         import datetime
-        import os as _os
 
-        ts = datetime.datetime.fromtimestamp(_os.path.getmtime(sys.executable), tz=datetime.timezone.utc)
-        return ts.strftime("%Y-%m-%d %H:%M:%S")
+        ts = datetime.datetime.fromtimestamp(os.path.getmtime(sys.executable), tz=datetime.timezone.utc)
+        return format_timestamp(ts)
     except Exception:
         return ""
 
@@ -541,16 +548,8 @@ def history_rewrite(
     # 取代 click.UsageError（其默认渲染无 hint，会产生裸 ❌）。
     manager = _manager()
 
-    def _split_pair(v: str | None):
-        if not v:
-            return None, None
-        if ":" in v:
-            p = v.split(":", 1)
-            return p[0], p[1]
-        return None, v
-
-    old_name, new_name = _split_pair(name)
-    old_email, new_email = _split_pair(email)
+    old_name, new_name = split_pair(name)
+    old_email, new_email = split_pair(email)
     precise = bool(old_name or old_email)
     full_name = bool(new_name and not old_name)
     full_email = bool(new_email and not old_email)
@@ -575,7 +574,8 @@ def history_rewrite(
 
 
 # ===========================================================================
-# config 组 - 系统配置
+# config 组 - 系统配置（语言 / 自动作者联动 / 配置总览）
+# 注：软件更新与重新安装不在此组，见下方 version 组（self-update 语义归属版本管理）
 # ===========================================================================
 
 config_app = typer.Typer(
@@ -594,7 +594,6 @@ def config_default(
         manager = _manager()
         manager.config.show()
         _fail_exit(manager)
-        _show_tip("config", "update")
 
 
 @config_app.command("auto-author", help=_(K.cmd.config_auto_author))
@@ -632,21 +631,65 @@ def config_lang(
     _show_tip("config", "language")
 
 
-@config_app.command("update", help=_(K.cmd.config_update))
-def config_update(
-    check: bool = typer.Option(False, "--check", help=_(K.opt.check_only)),
-    force: bool = typer.Option(False, "--force", help=_(K.opt.force_check)),
+# ===========================================================================
+# version 组 - 版本与自更新（sshm --version 为顶层 flag，sshm version 子命令组）
+#   - sshm -v / --version    详细版本信息（独立 flag，不走本组）
+#   - sshm version           显示版本组帮助（等价于 sshm version -h）
+#   - sshm version update    检查/更新到最新（支持 -f 强制 -y 跳过确认）
+#   - sshm version reinstall 重新安装（默认最新，--version X 指定版本覆盖）
+# ===========================================================================
+
+version_app = typer.Typer(
+    name="version",
+    help=_(K.cmd.group_version),
+    rich_markup_mode="rich",
+)
+
+
+@version_app.callback(invoke_without_command=True)
+def version_default(
+    ctx: typer.Context,
+) -> None:
+    """未指定子命令时，显示版本组帮助（等价于 sshm version -h）。"""
+    if ctx.invoked_subcommand is None:
+        # 直接打印 group 帮助，避免触发 UsageError 被全局异常处理器渲染为 ❌
+        print(ctx.get_help())
+
+
+@version_app.command("update", help=_(K.cmd.version_update))
+def version_update(
+    check: bool = typer.Option(False, "--check", "-c", help=_(K.opt.check_only)),
+    force: bool = typer.Option(False, "--force", "-f", help=_(K.opt.force_check)),
+    yes: bool = typer.Option(False, "--yes", "-y", help=_(K.opt.yes_prompts)),
 ):
-    """检查并更新到最新版本"""
+    """检查并更新到最新版本。"""
     manager = _manager()
-    code = manager.config.update(check=check, force=force)
+    code = manager.system.update(check=check, force=force, yes=yes)
     if code is not None:
         raise typer.Exit(code=code)
-    _show_tip("config", "update")
+
+
+@version_app.command("reinstall", help=_(K.cmd.version_reinstall))
+def version_reinstall(
+    target_version: str = typer.Option(
+        None,
+        "--version",
+        "-V",
+        help=_(K.opt.version_target),
+        show_default=False,
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help=_(K.opt.force_check)),
+    yes: bool = typer.Option(False, "--yes", "-y", help=_(K.opt.yes_prompts)),
+):
+    """重新安装（覆盖当前可执行文件）。默认升级到最新；--version X 指定版本。"""
+    manager = _manager()
+    code = manager.system.reinstall(target_version=target_version, force=force, yes=yes)
+    if code is not None:
+        raise typer.Exit(code=code)
 
 
 # ===========================================================================
-# 组装：注册 6 个分组到顶层
+# 组装：注册分组到顶层
 # ===========================================================================
 
 for _grp in GROUP_ORDER:
@@ -657,6 +700,7 @@ for _grp in GROUP_ORDER:
         "author": author_app,
         "history": history_app,
         "config": config_app,
+        "version": version_app,
     }[_grp]
     app.add_typer(_target)
 

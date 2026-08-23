@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-系统命令组 - 系统级命令的编排（lang / update / add_path）。
+系统命令组 - 系统级命令的编排（update / reinstall / add_path）。
 
-只负责把用户意图翻译为对 StateManager / UpdateManager / path 的编排调用 + 渲染。
+只负责把用户意图翻译为对 UpdateManager / path 的编排调用 + 渲染。
+系统配置（语言 / 自动作者）见 config.py 的 ConfigCommands。
 """
 
 from __future__ import annotations
@@ -11,51 +12,37 @@ from typing import TYPE_CHECKING
 
 from ...i18n import _
 from ...language import K
+from ...ui.console import prompt_confirm
+from ...ui.icons import done as _done
+from ...ui.icons import ok as _ok
+from ...ui.icons import tip as _tip
 from ...ui.output import print
 from ...ui.output import separator as print_separator
 
+
 if TYPE_CHECKING:
     from ..manager import SSHKeyManager
+    from ..services.net.updater import UpdateManager
 
 
 class SystemCommands:
-    """系统命令编排。"""
+    """系统命令编排（更新 / 重新安装 / PATH）。"""
 
     def __init__(self, m: SSHKeyManager):
         self.m = m
 
-    def show(self) -> None:
-        """显示当前系统配置总览（语言 + 自动作者联动开关）。"""
-        from ...i18n import get_lang
-        from ...ui.output import section as print_section_header
-
-        lang = get_lang()
-        name = "Chinese" if lang == "zh" else "English"
-        print_section_header(_(K.hdr.auto_author))
-        print(f"   {_(K.lbl.current_language)} {name} ({lang})")
-
-        auto_author = self.m.state_manager.read_auto_author()
-        status = _(K.misc.on) if auto_author else _(K.misc.off)
-        print(f"   🔀 {_(K.msg.auto_author_status, status=status)}")
-
-    def language(self, lang: str) -> str:
-        """设置输出语言并持久化到状态文件
+    def update(
+        self,
+        check: bool = False,
+        force: bool = False,
+        yes: bool = False,
+    ) -> int | None:
+        """检查并更新到最新版本。
 
         Args:
-            lang: 'en' 或 'zh'
-
-        Returns:
-            实际生效的语言（非法值回退 'en'）
-        """
-        lang = lang if lang == "zh" else "en"
-        self.m.state_manager.write_lang(lang)
-        from ...i18n import set_lang
-
-        set_lang(lang)
-        return lang
-
-    def update(self, check: bool = False, force: bool = False) -> int | None:
-        """检查并更新到最新版本。
+            check: 仅检查不更新
+            force: 忽略缓存强制检查
+            yes: 跳过确认直接更新
 
         Returns:
             退出码（0 成功 / 1 失败）；无需退出（已最新 / 仅检查 / 取消）返回 None
@@ -73,10 +60,65 @@ class SystemCommands:
         update_info = updater.check_update(force=force)
 
         if not update_info:
-            print("✅ " + _(K.upd.up_to_date))
+            print(_ok(K.upd.up_to_date))
             return None
 
-        print(f"\n🎉 {_(K.upd.new_version, version=update_info['version'])}")
+        return self._apply_update(updater, update_info, check=check, yes=yes)
+
+    def reinstall(
+        self,
+        target_version: str | None = None,
+        force: bool = False,
+        yes: bool = False,
+    ) -> int | None:
+        """重新安装（覆盖当前可执行文件）。
+
+        - 不指定 target_version：默认升级到最新版本（与 update 等价）。
+        - 指定 target_version：下载该 tag 资产覆盖（用于修复损坏 / 回滚到指定版本）。
+
+        Returns:
+            退出码（0 成功 / 1 失败）；无匹配资产 / 取消时返回 None
+        """
+        from ..services.net.updater import UpdateManager
+
+        updater = UpdateManager()
+        print_separator()
+        print(_(K.hdr.update))
+        print_separator()
+        print(f"\n{_(K.lbl.current_version)} v{updater.current_version}")
+        print(f"{_(K.lbl.platform)} {updater.platform}")
+
+        if target_version:
+            print("\n" + _(K.upd.reinstall_checking, version=target_version))
+            update_info = updater.get_release_by_tag(target_version)
+            if not update_info:
+                self.m._fail(_(K.upd.reinstall_not_found, version=target_version))
+                return None
+            # 指定版本即目标，无需再比较新旧
+            return self._apply_update(updater, update_info, check=False, yes=yes, reinstall=True)
+        else:
+            # 不指定版本：重装当前版本（强制覆盖），不判断新旧
+            print("\n" + _(K.upd.reinstall_checking, version=f"v{updater.current_version}"))
+            update_info = updater.get_release_by_tag(f"v{updater.current_version}")
+            if not update_info:
+                self.m._fail(_(K.upd.reinstall_not_found, version=f"v{updater.current_version}"))
+                return None
+            return self._apply_update(updater, update_info, check=False, yes=yes, reinstall=True)
+
+    def _apply_update(
+        self,
+        updater: "UpdateManager",
+        update_info: dict,
+        *,
+        check: bool = False,
+        yes: bool = False,
+        reinstall: bool = False,
+    ) -> int | None:
+        """展示更新信息并（在获得确认后）执行下载替换。
+
+        update / reinstall 共用：负责信息展示、确认逻辑、下载调用。
+        """
+        print(f"\n{_done(K.upd.new_version, version=update_info['version'])}")
         print(f"{_(K.upd.release_date)} {update_info.get('published_at') or _(K.msg.unknown)}")
 
         if update_info.get("body"):
@@ -87,18 +129,14 @@ class SystemCommands:
                 print("  ...")
 
         if check:
-            print(f"\n💡 {_(K.upd.run_update)}")
+            print(f"\n{_tip(K.upd.run_update)}")
             return None
 
-        print()
-        try:
-            response = input(_(K.upd.prompt, version=update_info["version"]))
-            if response.lower() == "n":
+        if not yes:
+            print()
+            if not prompt_confirm(_(K.upd.prompt, version=update_info["version"]), default="y"):
                 self.m._fail(_(K.upd.cancelled))
                 return None
-        except KeyboardInterrupt:
-            self.m._fail(_(K.upd.cancelled))
-            return None
 
         print()
         success = updater.download_and_update(update_info["download_url"])

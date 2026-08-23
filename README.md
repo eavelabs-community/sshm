@@ -176,7 +176,8 @@ sshm 遵循标准且安全的目录结构：
 | `sshm backup create / list / restore` | 备份、列出、恢复密钥 |
 | `sshm config auto-author [on/off]` | 开关"密钥-作者"自动联动（默认开启；省略参数可查看当前状态） |
 | `sshm config language [en/zh]` | 切换中英文输出（省略参数可查看当前语言） |
-| `sshm config update` | 检查并更新到最新版本 |
+| `sshm version update [-f -y]` | 检查并更新到最新版本（`-y` 跳过确认） |
+| `sshm version reinstall [--version X]` | 重新安装/回滚到指定版本 |
 | `sshm --help` | 查看完整帮助 |
 
 > 📖 完整命令详解与实战案例请见 [使用指南](docs/USAGE.md)

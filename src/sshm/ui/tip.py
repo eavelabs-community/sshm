@@ -3,7 +3,7 @@
 统一"tip 段"渲染模板 - 复用于命令底部与错误场景，避免到处手写不同的输出格式。
 
 设计动机：
-  原代码里"💡 提示 + 列表"以多种形式散落在 _show_tip、单行 tip、
+  原代码里"ICON_TIP 提示 + 列表"以多种形式散落在 _show_tip、单行 tip、
   内联 print 等多处，样式不一致；错误场景更是另起一个红色 Panel，
   风格与正常命令底部脱节。本模块提供唯一渲染入口：
 
@@ -27,7 +27,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from .console import print_separator
-from .output import ICON_BULLET, ICON_ERR
+from .output import ICON_BULLET, ICON_ERR, ICON_TIP
 from .output import print as _print
 
 __all__ = [
@@ -76,7 +76,7 @@ def render_tip_block(lines: Iterable[str], *, top: bool = True, style: str | Non
 
 
 def command_list_lines(group: str | None, cmds: Iterable[Any], title_key: str = "misc.related_tip") -> list[str]:
-    """统一生成"💡 More commands in this group"命令清单行（唯一格式来源）。
+    """统一生成"ICON_TIP More commands in this group"命令清单行（唯一格式来源）。
 
     收敛了原先散落在 app._show_tip 与 suggest._group_commands_lines /
     _top_level_lines 的命令行格式化逻辑，避免格式漂移。
@@ -91,7 +91,7 @@ def command_list_lines(group: str | None, cmds: Iterable[Any], title_key: str = 
     """
     from ..i18n import _
 
-    lines = [f"💡 {_(title_key)}"]
+    lines = [f"{ICON_TIP} {_(title_key)}"]
     for item in cmds:
         if isinstance(item, str):
             lines.append(f"{ITEM_BULLET} sshm {item}")
@@ -145,5 +145,5 @@ def render_business_error(msg: str, *, icon: str = ICON_ERR, hint: str | None = 
     _print(f"{icon} {msg}")
     if hint:
         # hint 可为多行（\n 分隔），逐行渲染为 💡 tip 段，保留既有缩进/前缀
-        lines = [f"💡 {ln}" if idx == 0 else ln for idx, ln in enumerate(hint.split("\n"))]
+        lines = [f"{ICON_TIP} {ln}" if idx == 0 else ln for idx, ln in enumerate(hint.split("\n"))]
         render_tip_block(lines)

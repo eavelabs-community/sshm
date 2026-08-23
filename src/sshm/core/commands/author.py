@@ -13,8 +13,13 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..utils.process import git
+
 from ...i18n import _
 from ...language import K
+from ...ui.icons import ok as _ok
+from ...ui.icons import tip as _tip
+from ...ui.icons import warn as _warn
 from ...ui.output import (
     ICON_WARN,
     print,
@@ -22,6 +27,8 @@ from ...ui.output import (
 from ...ui.output import (
     confirm as prompt_confirm,
 )
+
+
 from ..errors import ErrCode
 from ...ui.output import (
     section as print_section_header,
@@ -90,7 +97,7 @@ class AuthorCommands:
             print("   " + _(K.msg.current_effective))
         render_tip_block(
             [
-                f"💡 {_(K.msg.author_list_tip)}",
+                f"{_tip(K.msg.author_list_tip)}",
                 "   " + _(K.msg.quick_set),
                 "   " + _(K.msg.clear_repo_config),
             ]
@@ -141,7 +148,7 @@ class AuthorCommands:
             print(f"\n⚠️  {_(K.msg.current_scope_author, scope=scope_name)}")
             print(f"   user.name: {current_name or not_set}")
             print(f"   user.email: {current_email or not_set}")
-            if not prompt_confirm(_(K.misc.overwrite)):
+            if not prompt_confirm(_(K.misc.overwrite), default="n"):
                 self.m._fail(_(K.misc.operation_cancelled))
                 return
 
@@ -149,35 +156,23 @@ class AuthorCommands:
         unchanged = []
         try:
             if author["name"]:
-                subprocess.run(
-                    [
-                        "git",
-                        "-C",
-                        str(repo_path),
-                        "config",
-                        f"--{scope}",
-                        "user.name",
-                        author["name"],
-                    ],
-                    check=True,
-                    capture_output=True,
+                git(
+                    repo_path,
+                    "config",
+                    f"--{scope}",
+                    "user.name",
+                    author["name"],
                 )
                 changed.append(f"user.name = {author['name']}")
             else:
                 unchanged.append(f"user.name = {current_name or _(K.misc.not_set)}")
             if author["email"]:
-                subprocess.run(
-                    [
-                        "git",
-                        "-C",
-                        str(repo_path),
-                        "config",
-                        f"--{scope}",
-                        "user.email",
-                        author["email"],
-                    ],
-                    check=True,
-                    capture_output=True,
+                git(
+                    repo_path,
+                    "config",
+                    f"--{scope}",
+                    "user.email",
+                    author["email"],
                 )
                 changed.append(f"user.email = {author['email']}")
             else:
@@ -215,7 +210,8 @@ class AuthorCommands:
                 K.msg.confirm_clear,
                 scope=scope_name,
                 fallback=fallback_name,
-            )
+            ),
+            default="n",
         ):
             self.m._fail(_(K.misc.operation_cancelled))
             return
@@ -223,25 +219,19 @@ class AuthorCommands:
         removed = []
         for key in ("user.name", "user.email"):
             try:
-                subprocess.run(
-                    [
-                        "git",
-                        "-C",
-                        str(repo_path),
-                        "config",
-                        f"--{scope}",
-                        "--unset-all",
-                        key,
-                    ],
-                    check=True,
-                    capture_output=True,
+                git(
+                    repo_path,
+                    "config",
+                    f"--{scope}",
+                    "--unset-all",
+                    key,
                 )
                 removed.append(key)
             except subprocess.CalledProcessError:
                 pass
 
         if removed:
-            print(f"✅ {_(K.msg.cleared_scope, scope=scope_name, keys=', '.join(removed))}")
+            print(_ok(K.msg.cleared_scope, scope=scope_name, keys=", ".join(removed)))
         else:
             print("📝  " + _(K.msg.no_config_clear))
 
@@ -417,10 +407,10 @@ class AuthorCommands:
         print(f"  {_(K.lbl.author_name)} {info.get('name') or not_set}")
         print(f"  {_(K.lbl.author_email)} {info.get('email') or not_set}")
 
-        if not skip_confirm and not prompt_confirm(_(K.msg.confirm_delete)):
+        if not skip_confirm and not prompt_confirm(_(K.msg.confirm_delete), default="n"):
             self.m._fail(_(K.misc.operation_cancelled))
             return
 
         self.m.state_manager.delete_author(label_lower)
-        print(f"✅ {_(K.msg.author_deleted, label=label)}")
+        print(_ok(K.msg.author_deleted, label=label))
         print("   " + _(K.msg.not_rolled_back))

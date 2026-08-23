@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -17,18 +16,11 @@ from pathlib import Path
 from ....constants import SSH_CONFIG_NAME, STATE_FILE_NAME
 from ....i18n import _
 from ....language import K
+from ...utils.fileperms import secure_key_perms
 from ....ui.console import format_timestamp
+from ....ui.icons import ok as _ok
+from ....ui.icons import tip as _tip
 from ....ui.output import confirm, print, section
-
-
-def _secure_key_perms(path: Path, private: bool) -> None:
-    """Unix 下兜底设置密钥文件权限：私钥 600，公钥 644。"""
-    if os.name != "posix":
-        return
-    try:
-        path.chmod(0o600 if private else 0o644)
-    except OSError:
-        pass  # 平台/只读异常时忽略，不影响主流程
 
 
 class BackupService:
@@ -73,7 +65,7 @@ class BackupService:
             backed_up.append(SSH_CONFIG_NAME)
 
         if not silent:
-            print(f"✅ {_(K.msg.backup_complete)} {backup_path}")
+            print(f"{_ok(K.msg.backup_complete)} {backup_path}")
             print("📦 " + _(K.msg.files_backed_up, count=len(backed_up)))
 
         return backup_path
@@ -154,7 +146,7 @@ class BackupService:
                 target = self.ssh_dir / f.name
                 shutil.copy2(f, target)
                 # 恢复私钥时兜底 chmod 600（Unix），公钥 644
-                _secure_key_perms(target, private=not f.name.endswith(".pub"))
+                secure_key_perms(target, private=not f.name.endswith(".pub"))
                 restored.append(f.name)
             except OSError as e:
                 self._error("RESTORE_FAILED_DETAIL", name=f.name, detail=e)
@@ -168,7 +160,7 @@ class BackupService:
             print(f"\n✅ {_(K.msg.restored_count, count=len(restored))}")
             for name in restored:
                 print(f"   - {name}")
-            print("\n💡 " + _(K.msg.restore_tip))
+            print(f"\n{_tip(K.msg.restore_tip)}")
 
         # 备份中的 config 仅供存档，不自动覆盖当前配置，提示手动重建别名
         config_backup = backup_path / SSH_CONFIG_NAME

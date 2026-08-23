@@ -27,6 +27,7 @@ class UpdateManager:
     """更新管理器"""
 
     GITHUB_API = "https://api.github.com/repos/eavelabs-community/sshm/releases/latest"
+    GITHUB_TAG_API = "https://api.github.com/repos/eavelabs-community/sshm/releases/tags/{tag}"
     CACHE_FILE = Path.home() / ".sshm_update_cache"
     CACHE_VALID_HOURS = 24
 
@@ -143,29 +144,9 @@ class UpdateManager:
             if not self._is_newer_version(latest_version, self.current_version):
                 return None
 
-            # 查找当前平台的下载链接：按平台关键词模糊匹配，排除源码包
-            keywords = self._PLATFORM_ASSET_KEYWORDS.get(self.platform, ())
-            _SOURCE_SUFFIXES = (".tar.gz", ".zip", ".tar.xz")
-            download_url = None
-            for asset in data.get("assets", []):
-                name = asset.get("name", "").lower()
-                # 跳过源码包/文档等非可执行资产
-                if name.endswith(_SOURCE_SUFFIXES) or "source" in name:
-                    continue
-                # 当前平台关键词命中（资产名通常明确区分平台）
-                if any(k in name for k in keywords):
-                    download_url = asset.get("browser_download_url")
-                    break
-
-            if not download_url:
+            result = self._build_release_info(data)
+            if result is None:
                 return None
-
-            result = {
-                "version": latest_version,
-                "download_url": download_url,
-                "body": data.get("body", ""),
-                "published_at": data.get("published_at", ""),
-            }
 
             # 保存到缓存
             self._save_cache(result)
@@ -174,6 +155,56 @@ class UpdateManager:
 
         except URLError:
             # 网络错误，静默失败
+            return None
+        except Exception:
+            return None
+
+    def _match_platform_asset(self, data: dict) -> str | None:
+        """从 release assets 中按当前平台关键词模糊匹配可执行资产下载链接。"""
+        keywords = self._PLATFORM_ASSET_KEYWORDS.get(self._detect_platform(), ())
+        _SOURCE_SUFFIXES = (".tar.gz", ".zip", ".tar.xz")
+        for asset in data.get("assets", []):
+            name = asset.get("name", "").lower()
+            # 跳过源码包/文档等非可执行资产
+            if name.endswith(_SOURCE_SUFFIXES) or "source" in name:
+                continue
+            # 当前平台关键词命中（资产名通常明确区分平台）
+            if any(k in name for k in keywords):
+                return asset.get("browser_download_url")
+        return None
+
+    def _build_release_info(self, data: dict) -> dict | None:
+        """把 GitHub release JSON 组装为 {version, download_url, body, published_at}。
+
+        平台无匹配资产时返回 None。
+        """
+        download_url = self._match_platform_asset(data)
+        if not download_url:
+            return None
+        return {
+            "version": data["tag_name"],
+            "download_url": download_url,
+            "body": data.get("body", ""),
+            "published_at": data.get("published_at", ""),
+        }
+
+    def get_release_by_tag(self, tag: str) -> dict | None:
+        """按 tag 查询指定版本 release 的可执行资产信息（供 reinstall 指定版本）。
+
+        Args:
+            tag: 版本标签，如 'v0.0.5' 或 '0.0.5'
+
+        Returns:
+            {version, download_url, body, published_at} 或 None（无匹配/网络错误）
+        """
+        try:
+            url = self.GITHUB_TAG_API.format(tag=tag)
+            req = Request(url)
+            req.add_header("User-Agent", f"sshm/{VERSION}")
+            with urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode("utf-8"))
+            return self._build_release_info(data)
+        except URLError:
             return None
         except Exception:
             return None
@@ -194,18 +225,15 @@ class UpdateManager:
             return False
 
         try:
-            print(_(K.upd.downloading))
-
             # 下载到临时文件
             req = Request(download_url)
             req.add_header("User-Agent", f"sshm/{VERSION}")
 
             with urlopen(req, timeout=60) as response:
-                total_size = int(response.headers.get("content-length", 0))
-                downloaded = 0
-                chunk_size = 8192
+                # 跟随重定向后的最终响应才携带可靠的 content-length
+                total_size = int(response.headers.get("content-length", 0) or 0)
+                chunk_size = 64 * 1024  # 64KB 分块，减少刷新次数
 
-                # 创建临时文件
                 temp_fd, temp_path = tempfile.mkstemp(suffix=".exe" if self.platform == "windows" else "")
                 os.close(temp_fd)  # 立即关闭 fd，避免文件句柄泄漏（更新后无法删除临时文件）
 
@@ -221,12 +249,8 @@ class UpdateManager:
                         if not chunk:
                             break
                         f.write(chunk)
-                        downloaded += len(chunk)
-                        # 进度条实时刷新（rich 可用时显示；否则降级无操作）
-                        p.update(
-                            completed=downloaded,
-                            total=total_size if total_size > 0 else None,
-                        )
+                        # advance 实时刷新；total 缺失时 rich 显示不确定进度
+                        p.update(advance=len(chunk))
 
             # 获取当前可执行文件路径
             current_exe = sys.executable if getattr(sys, "frozen", False) else sys.argv[0]

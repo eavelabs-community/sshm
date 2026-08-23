@@ -264,12 +264,21 @@ sshm config language en         # 切换为英文
 
 ---
 
-#### `update` - 检查更新
+#### `version update` - 检查并更新
 
 ```bash
-sshm config update              # 检查并更新到最新版本
-sshm config update --check      # 仅检查更新
-sshm config update --check --force  # 强制检查（忽略缓存）
+sshm version update                 # 检查并更新到最新版本
+sshm version update --check         # 仅检查更新
+sshm version update --check --force # 强制检查（忽略缓存）
+sshm version update --yes           # 跳过确认直接更新
+```
+
+#### `version reinstall` - 重新安装（覆盖当前可执行文件）
+
+```bash
+sshm version reinstall                      # 默认升级到最新版本并覆盖
+sshm version reinstall --version v0.0.5     # 指定版本（回滚 / 修复损坏）
+sshm version reinstall --yes --force        # 跳过确认 + 强制检查
 ```
 
 ---

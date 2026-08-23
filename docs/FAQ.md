@@ -98,8 +98,8 @@ sshm repo test       # 测试当前仓库连接
 **A:**
 
 ```bash
-sshm config update          # 检查并更新
-sshm config update --check  # 仅检查
+sshm version update          # 检查并更新
+sshm version update --check  # 仅检查
 ```
 
 程序每次运行也会静默检查更新并提示。
@@ -134,7 +134,7 @@ sshm repo test        # 测试连接
 
 ### Q: 为什么 `sshm key list` 提示有新版本但不更新？
 
-**A:** 静默检查只会**提示**，不会自动更新。执行 `sshm config update` 并按提示确认即可。
+**A:** 静默检查只会**提示**，不会自动更新。执行 `sshm version update` 并按提示确认即可。
 
 ---
 

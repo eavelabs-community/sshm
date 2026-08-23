@@ -17,10 +17,16 @@ from ...constants import DEFAULT_KEY_TYPE, SUPPORTED_KEY_TYPES
 from ...i18n import _
 from ...language import K
 from ...ui.console import format_timestamp
+from ..utils.process import run_checked
+from ...ui.icons import ok as _ok
+from ...ui.icons import tip as _tip
+from ...ui.icons import warn as _warn
 from ...ui.output import (
     ICON_WARN,
     print,
 )
+
+
 from ...ui.output import (
     confirm as prompt_confirm,
 )
@@ -90,7 +96,7 @@ class KeyCommands:
         active_keys = self.m.state_manager.read_active_keys()
 
         if not keys_by_label:
-            print("⚠️  " + _(K.msg.no_keys))
+            print(_warn(K.msg.no_keys))
             print("\n💡 " + _(K.msg.add_tip))
             return
 
@@ -171,9 +177,9 @@ class KeyCommands:
         # list -c 且无匹配时，给出友好提示而非空表格
         if current_only and not rows:
             if not (Path(repo_path).resolve() / ".git").exists():
-                print("⚠️  " + _(K.err.not_git_repo, path=Path(repo_path).resolve()))
+                print(_warn(K.err.not_git_repo, path=Path(repo_path).resolve()))
             else:
-                print("⚠️  " + _(K.msg.repo_key_missing))
+                print(_warn(K.msg.repo_key_missing))
             print("   " + _(K.msg.configure_repo_tip))
             print("   " + _(K.msg.or_list_all))
             return
@@ -196,7 +202,7 @@ class KeyCommands:
                 print(f"\n[{label}] {file_name}.pub")
                 print(f"  {content}\n")
 
-        render_tip_block([f"💡 {_(K.msg.use_tip)}"])
+        render_tip_block([_tip(K.msg.use_tip)])
 
     def current(self, repo_path: str | Path = "."):
         """展示当前正在生效的密钥（含来源与全局默认详情）。
@@ -221,7 +227,7 @@ class KeyCommands:
             label = active_keys[first_type]
             print(f"📍 {_(K.misc.current_key)}: {label.upper()} ({_(K.misc.scope_global)})")
         else:
-            print("⚠️  " + _(K.msg.current_key_none))
+            print(_warn(K.msg.current_key_none))
 
         # 全局默认密钥详情（若存在）
         if active_keys:
@@ -232,7 +238,7 @@ class KeyCommands:
         # 操作提示（统一 tip 段模板）
         render_tip_block(
             [
-                f"💡 {_(K.msg.current_key_tip)}",
+                f"{_tip(K.msg.current_key_tip)}",
                 "   " + _(K.msg.current_key_tip2),
             ]
         )
@@ -279,8 +285,8 @@ class KeyCommands:
         cmd = ["ssh-keygen", "-t", key_type, "-C", email, "-f", str(key_file), "-N", ""]
 
         try:
-            subprocess.run(cmd, check=True, capture_output=True, timeout=60)
-            print(f"✅ {_(K.msg.key_created, name=key_file.name)}")
+            run_checked(cmd, timeout=60)
+            print(_ok(K.msg.key_created, name=key_file.name))
 
             if host:
                 hostname = host
@@ -291,13 +297,13 @@ class KeyCommands:
             if host:
                 host_alias = self.m.gitrepo.get_host_alias(label)
                 self.m.config_manager.update_host(host_alias, hostname, key_file)
-                print(f"✅ {_(K.msg.ssh_config_updated, alias=host_alias, hostname=hostname)}")
+                print(_ok(K.msg.ssh_config_updated, alias=host_alias, hostname=hostname))
 
             pub_file = Path(str(key_file) + ".pub")
             if pub_file.exists():
                 pub_key = pub_file.read_text(encoding="utf-8").strip()
                 print(f"\n📋 {_(K.msg.pub_key_content)}\n{pub_key}\n")
-                print("💡 " + _(K.msg.add_to_platform))
+                print(_tip(K.msg.add_to_platform))
 
             # 记录作者信息（供 sshm author 使用）
             self.m.state_manager.write_author(label, name or "", email)
@@ -336,7 +342,7 @@ class KeyCommands:
             else:
                 confirm_msg = _(K.err.delete_all_default)
 
-            if not prompt_confirm("⚠️  " + confirm_msg):
+            if not prompt_confirm(f"{ICON_WARN}  {confirm_msg}", default="n"):
                 self.m._fail(_(K.misc.operation_cancelled))
                 return
 
@@ -386,7 +392,7 @@ class KeyCommands:
                         removed_files.append(file.name)
 
         if removed_files:
-            print(f"✅ {_(K.msg.deleted_count, count=len(removed_files))}")
+            print(_ok(K.msg.deleted_count, count=len(removed_files)))
             for f in removed_files:
                 print(f"   - {f}")
 
@@ -406,7 +412,7 @@ class KeyCommands:
                 if active_keys.get(kt) == label_lower:
                     self.m.state_manager.remove_active_key(kt)
 
-            print(f"💡 {_(K.msg.tip_alias_remote, alias=self.m.gitrepo.get_host_alias(label))}")
+            print(_tip(K.msg.tip_alias_remote, alias=self.m.gitrepo.get_host_alias(label)))
             print("   " + _(K.msg.rerun_other_label))
         else:
             self.m._fail(ErrCode.KEY_NOT_FOUND, label=label, icon=ICON_WARN)
@@ -459,7 +465,7 @@ class KeyCommands:
 
         self.m.gitrepo.update_ssh_config_alias(label, source_file)
 
-        print(f"✅ {_(K.msg.switched_to, label=label, key_type=key_type)}")
+        print(_ok(K.msg.switched_to, label=label, key_type=key_type))
         print(f"{_(K.lbl.file_placeholder)} {target_file.name}")
 
         # 密钥↔作者自动联动：全局切换时自动设置全局 author（若 label 有绑定）
@@ -483,8 +489,8 @@ class KeyCommands:
             return
 
         if target_file.exists():
-            print(f"⚠️  {_(K.err.label_exists, new_label=new_label)}")
-            if not prompt_confirm(_(K.misc.overwrite)):
+            print(_warn(K.err.label_exists, new_label=new_label))
+            if not prompt_confirm(_(K.misc.overwrite), default="n"):
                 return
 
         self.m.keystore.copy_key_pair(source_file, target_file)
@@ -493,7 +499,7 @@ class KeyCommands:
         # 默认密钥通常由 switch_key 从某标签复制而来，active_keys 记录了来源标签。
         self._inherit_metadata_from_default(key_type, new_label)
 
-        print(f"✅ {_(K.msg.tag_added, new_label=new_label, key_type=key_type)}")
+        print(_ok(K.msg.tag_added, new_label=new_label, key_type=key_type))
 
         if switch_after:
             self.m.key.switch(new_label, key_type)
@@ -585,7 +591,7 @@ class KeyCommands:
             count=renamed_count,
             types=", ".join(types_to_rename),
         )
-        print(f"✅ {renamed_msg}")
-        print(f"💡 {_(K.msg.tip_alias, alias=self.m.gitrepo.get_host_alias(old_label))}")
+        print(_ok(renamed_msg))
+        print(_tip(K.msg.tip_alias, alias=self.m.gitrepo.get_host_alias(old_label)))
         tip_msg = _(K.msg.rerun_new_label, new_label=new_label)
         print(f"   {tip_msg}")

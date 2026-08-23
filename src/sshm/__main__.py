@@ -45,27 +45,29 @@ def _silent_update_check() -> None:
 def _should_silent_check() -> bool:
     """判断是否需要静默更新检查（排除版本/帮助/更新命令自身）
 
-    仅当首个非选项参数是实际业务命令时才检查；`sshm update` 自身、
-    以及 `-v` / `--help` 等无命令调用均跳过，避免把命令参数里的
-    "update" 字样误判（如 `sshm add my-update-key`）。
+    仅当首个非选项参数是实际业务命令时才检查；`sshm version update` /
+    `sshm version reinstall` 自身会处理更新，以及 `-v` / `--help` 等
+    无命令调用均跳过，避免把命令参数里的 "update" 字样误判
+    （如 `sshm key add my-update-key`）。
     """
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
     if not args:
         return False  # 无子命令（如 -v / --help / 空）
-    # 分组后更新命令为 `sshm config update`：跳过静默检查（自身会检查）
-    return not (len(args) >= 2 and args[0] == "config" and args[1] == "update")
+    # 更新命令归 version 组：`sshm version update` / `sshm version reinstall`
+    # 自身会检查或执行更新，跳过静默检查以免重复
+    return not (len(args) >= 2 and args[0] == "version" and args[1] in ("update", "reinstall"))
 
 
 def main() -> None:
     """主函数入口"""
-    # 无论 CLI 还是交互菜单，都先应用语言
+    # 无论 CLI 还是其它路径，都先应用语言
     _load_lang_before_parse()
 
-    # 检测双击运行（无参数）→ 进入交互菜单
+    # 双击/无参数运行：展示帮助作为入口引导（交互式菜单已移除）
     if len(sys.argv) == 1:
-        from .cli.interactive import show_interactive_menu
+        from .cli.app import app
 
-        show_interactive_menu()
+        app(["--help"])
         return
 
     # 实际执行业务命令时静默检查更新（后台线程，避免网络等待阻塞命令执行）

@@ -5,13 +5,13 @@
 不涉及任何业务编排、状态持久化或输出；SSHKeyManager 组合本服务并做门面委托。
 """
 
-import os
 import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ....constants import SUPPORTED_KEY_TYPES
+from ...utils.fileperms import secure_key_perms
 from .keypaths import get_key_pattern, private_key_path, public_key_path
 
 
@@ -81,21 +81,11 @@ class KeyStore:
         导致私钥以宽松权限落地（copy2 会保留源 mode，需显式兜底）。
         """
         shutil.copy2(source, target)
-        self._secure_perms(target, private=True)
+        secure_key_perms(target, private=True)
         pub_source = Path(str(source) + ".pub")
         if pub_source.exists():
             shutil.copy2(pub_source, Path(str(target) + ".pub"))
-            self._secure_perms(Path(str(target) + ".pub"), private=False)
-
-    @staticmethod
-    def _secure_perms(path: Path, private: bool) -> None:
-        """Unix 下兜底设置密钥文件权限：私钥 600，公钥 644。"""
-        if os.name != "posix":
-            return
-        try:
-            path.chmod(0o600 if private else 0o644)
-        except OSError:
-            pass  # 平台/只读异常时忽略，不影响主流程
+            secure_key_perms(Path(str(target) + ".pub"), private=False)
 
     def extract_email_from_pubkey(self, key_type: str, label: str | None = None) -> str | None:
         """从公钥注释提取邮箱（ssh-keygen -C email 写入）

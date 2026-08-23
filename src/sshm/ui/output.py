@@ -71,6 +71,7 @@ ICON_OK = "✅"
 ICON_ERR = "❌"
 ICON_WARN = "⚠️"
 ICON_TIP = "💡"
+ICON_DONE = "🎉"
 ICON_BULLET = "➖"
 
 
@@ -81,7 +82,7 @@ class ConsoleOutput(Output):
     # 无需改动各命令调用点即可获得语义化的终端配色。
     _EMOJI_STYLE: ClassVar[dict] = {
         ICON_OK: "bold green",
-        "🎉": "bold green",
+        ICON_DONE: "bold green",
         "✔": "bold green",
         ICON_WARN: "yellow",
         "❗": "yellow",

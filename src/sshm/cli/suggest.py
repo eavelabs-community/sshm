@@ -20,7 +20,10 @@ from typing import Any
 from ..i18n import _
 from ..language import K
 from ..ui.console import _console, get_display_width
+from ..ui.icons import tip as _tip
 from ..ui.tip import command_list_lines
+
+
 from .registry import GROUP_ORDER, commands_in_group, related_commands
 
 # difflib 相似度阈值：精确/拼写错误的强匹配阈值，低于此值视为无相近候选
@@ -144,10 +147,10 @@ def render_error(argv: list[str], suggestions: list[str]) -> None:
     from ..ui.tip import ITEM_BULLET
 
     if suggestions:
-        tip_lines = [f"💡 {_(K.suggest.did_you_mean)}"]
+        tip_lines = [_tip(K.suggest.did_you_mean)]
         tip_lines += [f"{ITEM_BULLET} {s}" for s in suggestions]
     else:
-        tip_lines = [f"💡 {_(K.suggest.hint_help)}"]
+        tip_lines = [_tip(K.suggest.hint_help)]
     render_tip_block(tip_lines)
 
     # 块3：本组相关命令（组内错误 → 该分组全量命令；顶层未知 → 顶层分组名）
@@ -225,8 +228,8 @@ def _command_params_block(exc: Any) -> list[str]:
         entries.append((token, required, help_txt))
 
     # Usage 完整签名：按实际终端宽度（rich Console）自适应续行，
-    # 续行缩进对齐到 "💡 Usage: " 之后（用显示宽度计算，中文/emoji 双宽正确）。
-    prefix = f"💡 {_(K.suggest.usage)} {base}"
+    # 续行缩进对齐到 "ICON_TIP Usage: " 之后（用显示宽度计算，中文/emoji 双宽正确）。
+    prefix = f"{_tip(K.suggest.usage)} {base}"
     indent = " " * get_display_width(prefix)
     term_width = max(getattr(_console, "width", None) or 80, 1)
     tokens = [t for t, _, _ in entries]

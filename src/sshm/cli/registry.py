@@ -69,12 +69,15 @@ GROUPS: dict[str, list[CommandMeta]] = {
     "config": [
         CommandMeta("language", K.cmd.config_language, "config"),
         CommandMeta("auto-author", K.cmd.config_auto_author, "config"),
-        CommandMeta("update", K.cmd.config_update, "config"),
+    ],
+    "version": [
+        CommandMeta("update", K.cmd.version_update, "version"),
+        CommandMeta("reinstall", K.cmd.version_reinstall, "version"),
     ],
 }
 
 # 分组展示顺序（顶层帮助中的分组排列）
-GROUP_ORDER: list[str] = ["key", "repo", "backup", "author", "history", "config"]
+GROUP_ORDER: list[str] = ["key", "repo", "backup", "author", "history", "config", "version"]
 
 
 # ---------------------------------------------------------------------------

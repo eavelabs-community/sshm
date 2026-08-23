@@ -18,6 +18,7 @@ import subprocess
 
 from ....i18n import _
 from ....language import K
+from ...utils.process import run_checked
 
 # 成功关键词：优先精确匹配，避免误报（不采用过宽的 'hi '）
 _SSH_SUCCESS_MARKERS = (
@@ -61,7 +62,7 @@ class SSHTester:
             (True, 成功说明) 或 (False, 失败说明)
         """
         try:
-            result = subprocess.run(
+            result = run_checked(
                 [
                     "ssh",
                     "-T",
@@ -71,8 +72,6 @@ class SSHTester:
                     "ConnectTimeout=10",
                     f"git@{host}",
                 ],
-                capture_output=True,
-                text=True,
                 timeout=10,
             )
 

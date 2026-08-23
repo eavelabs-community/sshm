@@ -23,6 +23,7 @@ from ..ui.output import ICON_ERR, ICON_WARN
 from ..ui.tip import render_business_error
 from .commands import (
     AuthorCommands,
+    ConfigCommands,
     HistoryCommands,
     KeyCommands,
     RepoCommands,
@@ -79,12 +80,20 @@ class SSHKeyManager:
         self.tester = SSHTester()
         self.author_service = AuthorService(self.state_manager, self.keystore, self.gitrepo, self._fail)
 
-        # 命令编排组（与 CLI 分组一一对应：key/repo/backup/author/history/config）
+        # 命令编排组
+        # - 业务组（与 CLI 分组一一对应）：key/repo/backup/author/history/config
+        # - system 组承载系统级命令（语言/更新/重新安装），单独命名避免与
+        #   config（系统配置：语言、自动作者）语义混淆
         self.key = KeyCommands(self)
         self.repo = RepoCommands(self)
         self.author = AuthorCommands(self)
         self.history = HistoryCommands(self)
-        self.config = SystemCommands(self)
+        self.config = ConfigCommands(self)
+        self.system = SystemCommands(self)
+        # CLI 顶层命令组为 `version`（version update/reinstall），与
+        # system 组（更新/重装/PATH）承载同一编排逻辑，此处暴露别名以
+        # 满足「CLI 分组名 = manager 属性」的一致性契约。
+        self.version = self.system
 
         # 确保必要目录存在
         self._ensure_directories()

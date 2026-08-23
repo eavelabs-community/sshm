@@ -8,19 +8,22 @@ Git 仓库命令组 - 仓库相关命令的编排（use / clone / info / test）
 
 from __future__ import annotations
 
-import re
 import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ...i18n import _
 from ...language import K
+from ...ui.icons import ok as _ok
+from ...ui.icons import tip as _tip
+from ...ui.icons import warn as _warn
 from ...ui.output import (
     ICON_ERR,
     ICON_OK,
-    ICON_WARN,
     print,
 )
+
+
 from ...ui.output import (
     confirm as prompt_confirm,
 )
@@ -36,6 +39,7 @@ from ...ui.output import (
 from ...ui.tip import render_tip_block
 from ..errors import ErrCode
 from ..services.ssh.keypaths import private_key_path, public_key_path
+from ..utils.process import git, run_checked
 
 if TYPE_CHECKING:
     from ..manager import SSHKeyManager
@@ -67,12 +71,7 @@ class RepoCommands:
         key_file = private_key_path(self.m.ssh_dir, key_type, label)
 
         try:
-            result = subprocess.run(
-                ["git", "-C", str(repo_path), "remote", "get-url", "origin"],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
+            result = git(repo_path, "remote", "get-url", "origin")
             current_url = result.stdout.strip()
             print(f"{_(K.lbl.current_remote_url)}\n   {current_url}\n")
 
@@ -101,7 +100,7 @@ class RepoCommands:
             print(f"   {new_url}\n")
 
             if not skip_confirm:
-                if not prompt_confirm(_(K.msg.update_url_prompt)):
+                if not prompt_confirm(_(K.msg.update_url_prompt), default="y"):
                     self.m._fail(_(K.misc.operation_cancelled))
                     return
 
@@ -109,27 +108,24 @@ class RepoCommands:
             print("🧪 " + _(K.msg.testing_ssh))
             test_ok, test_msg = self.m.tester.test(host_alias)
             if test_ok:
-                print("✅ " + _(K.msg.ssh_test_passed))
+                print(_ok(K.msg.ssh_test_passed))
                 if "Hi" in test_msg or "Welcome" in test_msg:
                     print(f"   {test_msg}")
             else:
-                print("⚠️  " + _(K.msg.ssh_test_failed))
+                print(_warn(K.msg.ssh_test_failed))
                 print(f"   {test_msg}")
                 print("   " + _(K.msg.not_added_yet))
                 if not skip_confirm:
-                    if not prompt_confirm(_(K.msg.update_url_anyway)):
+                    if not prompt_confirm(_(K.msg.update_url_anyway), default="y"):
                         self.m._fail(_(K.misc.operation_cancelled))
                         return
 
-            subprocess.run(
-                ["git", "-C", str(repo_path), "remote", "set-url", "origin", new_url],
-                check=True,
-            )
-            print("✅ " + _(K.msg.remote_url_updated) + "\n")
+            git(repo_path, "remote", "set-url", "origin", new_url)
+            print(_ok(K.msg.remote_url_updated) + "\n")
 
             print()
             print_separator()
-            print("✅ " + _(K.hdr.config_complete))
+            print(_ok(K.hdr.config_complete))
             print(f"   cd {repo_path}")
             print("   git push")
             print_separator()
@@ -189,7 +185,7 @@ class RepoCommands:
         print(f"   {new_url}\n")
 
         if not skip_confirm:
-            if not prompt_confirm(_(K.msg.clone_confirm)):
+            if not prompt_confirm(_(K.msg.clone_confirm), default="y"):
                 self.m._fail(_(K.misc.operation_cancelled))
                 return
 
@@ -198,7 +194,7 @@ class RepoCommands:
         if target_dir:
             clone_args.append(target_dir)
         try:
-            subprocess.run(clone_args, check=True)
+            run_checked(clone_args)
         except subprocess.CalledProcessError as e:
             detail = (e.stderr or b"").decode("utf-8", "replace").strip() or str(e)
             self.m._fail(ErrCode.CLONE_FAILED, err=detail)
@@ -219,7 +215,7 @@ class RepoCommands:
 
         print()
         print_separator()
-        print("✅ " + _(K.hdr.config_complete))
+        print(_ok(K.hdr.config_complete))
         print(f"   cd {cloned_dir}")
         print("   git push")
         print_separator()
@@ -237,13 +233,7 @@ class RepoCommands:
         print(f"{_(K.lbl.repo_path)} {repo_path}")
 
         try:
-            result = subprocess.run(
-                ["git", "remote", "get-url", "origin"],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
+            result = git(repo_path, "remote", "get-url", "origin")
             remote_url = result.stdout.strip()
             print(f"{_(K.lbl.remote_url)} {remote_url}")
 
@@ -255,10 +245,8 @@ class RepoCommands:
                 print(f"  ├─ {_(K.lbl.user_org)} {user}")
                 print(f"  └─ {_(K.lbl.repo)} {repo}")
 
-                ssh_pattern = r"git@([^:]+):"
-                match = re.match(ssh_pattern, remote_url)
-                if match:
-                    host_alias = match.group(1)
+                host_alias = self.m.gitrepo.extract_host_from_url(remote_url)
+                if host_alias:
                     # 反解别名对应的标签（容忍主机名首段含连字符，如 git-codecommit-{label}）
                     label = self.m.gitrepo.resolve_label_from_alias(host_alias)
                     if label:
@@ -289,14 +277,14 @@ class RepoCommands:
                     else:
                         render_tip_block(
                             [
-                                f"💡 {_(K.msg.current_alias_unconfigured)}",
+                                f"{_tip(K.msg.current_alias_unconfigured)}",
                                 "   " + _(K.msg.use_to_configure),
                             ]
                         )
                 else:
                     render_tip_block(
                         [
-                            f"💡 {_(K.msg.https_url_tip)}",
+                            f"{_tip(K.msg.https_url_tip)}",
                             "   " + _(K.msg.use_to_ssh),
                         ]
                     )
@@ -408,7 +396,7 @@ class RepoCommands:
 
             success, message = self.m.tester.test(host_alias)
             if success:
-                print(f"✅ {message}")
+                print(f"{ICON_OK} {message}")
             else:
                 self.m._fail(message)
         else:
@@ -423,25 +411,17 @@ class RepoCommands:
             print(f"{_(K.lbl.repo_path)} {repo_path}")
 
             try:
-                result = subprocess.run(
-                    ["git", "remote", "get-url", "origin"],
-                    cwd=repo_path,
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
+                result = git(repo_path, "remote", "get-url", "origin")
                 remote_url = result.stdout.strip()
                 print(f"{_(K.lbl.remote_url)} {remote_url}")
 
-                ssh_pattern = r"git@([^:]+):"
-                match = re.match(ssh_pattern, remote_url)
-                if match:
-                    host_alias = match.group(1)
+                host_alias = self.m.gitrepo.extract_host_from_url(remote_url)
+                if host_alias:
                     print(f"\n🧪 {_(K.msg.testing_host, host=host_alias)}")
 
                     success, message = self.m.tester.test(host_alias)
                     if success:
-                        print(f"✅ {message}")
+                        print(f"{ICON_OK} {message}")
                     else:
                         self.m._fail(message)
                         print("\n💡 " + _(K.msg.check_config_tip))

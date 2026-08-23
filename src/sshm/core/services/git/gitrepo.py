@@ -13,9 +13,15 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
+from ...utils.process import git
+
 from ....i18n import _
 from ....language import K
+from ....ui.icons import ok as _ok
+from ....ui.icons import warn as _warn
 from ....ui.output import ICON_WARN, confirm, print
+
+
 from ....ui.tip import render_business_error
 
 
@@ -126,13 +132,18 @@ class GitRepoService:
                 return label
         return None
 
+    @staticmethod
+    def extract_host_from_url(url: str) -> str | None:
+        """从 scp-like Git URL（git@host:user/repo.git）提取 host/别名段。"""
+        match = re.match(r"git@([^:]+):", url)
+        return match.group(1) if match else None
+
     def resolve_repo_hostname(self, url: str) -> str | None:
         """从 Git remote URL 提取真实主机名（别名优先从 SSH config HostName 反查）"""
         ssh2_match = re.match(r"ssh://(?:git@)?([^/:]+)", url)
         host = ssh2_match.group(1) if ssh2_match else None
         if not host:
-            ssh_match = re.match(r"git@([^:]+):", url)
-            host = ssh_match.group(1) if ssh_match else None
+            host = self.extract_host_from_url(url)
         if not host:
             https_match = re.match(r"https?://([^/]+)/", url)
             host = https_match.group(1) if https_match else None
@@ -200,14 +211,14 @@ class GitRepoService:
 
         if skip_confirm:
             self.state_manager.write_host(label, repo_hostname)
-            print("✅ " + _(K.msg.host_updated, label=label, host=repo_hostname))
+            print(_ok(K.msg.host_updated, label=label, host=repo_hostname))
             return True
 
         if confirm(_(K.msg.create_matching, host=repo_hostname), default="y"):
             self.state_manager.write_host(label, repo_hostname)
-            print("✅ " + _(K.msg.host_updated, label=label, host=repo_hostname))
+            print(_ok(K.msg.host_updated, label=label, host=repo_hostname))
             return True
-        self._error("⚠️  " + _(K.msg.skipped_no_mapping))
+        self._error(_warn(K.msg.skipped_no_mapping))
         return False
 
     def update_ssh_config_alias(self, label: str, key_file: Path) -> None:
@@ -246,18 +257,12 @@ class GitRepoService:
         if not (repo / ".git").exists():
             return None
         try:
-            result = subprocess.run(
-                ["git", "remote", "get-url", "origin"],
-                cwd=repo,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
+            result = git(repo, "remote", "get-url", "origin")
             remote_url = result.stdout.strip()
         except (subprocess.CalledProcessError, OSError):
             return None
 
-        match = re.match(r"git@([^:]+):", remote_url)
-        if not match:
+        host_alias = self.extract_host_from_url(remote_url)
+        if not host_alias:
             return None
-        return self.resolve_label_from_alias(match.group(1))
+        return self.resolve_label_from_alias(host_alias)
