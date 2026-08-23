@@ -24,6 +24,7 @@ from ..i18n import _, get_lang
 from ..language import LANGUAGES, K
 from ..ui.output import print
 from .registry import GROUP_ORDER, related_commands
+from ..core.errors import ErrCode
 
 
 class KeyType(str, Enum):
@@ -555,17 +556,17 @@ def history_rewrite(
     full_email = bool(new_email and not old_email)
     full_author = bool(author)
     if precise and (full_author or full_name or full_email):
-        manager._fail("REWRITE_USAGE")
+        manager._fail(ErrCode.REWRITE_USAGE)
         raise SystemExit(1)
     if full_author and (full_name or full_email):
-        manager._fail("REWRITE_USAGE")
+        manager._fail(ErrCode.REWRITE_USAGE)
         raise SystemExit(1)
     if not (full_author or full_name or full_email):
         if not old_name and not old_email:
-            manager._fail("NEED_OLD")
+            manager._fail(ErrCode.NEED_OLD)
             raise SystemExit(1)
         if not new_name and not new_email:
-            manager._fail("NEED_NEW")
+            manager._fail(ErrCode.NEED_NEW)
             raise SystemExit(1)
     # —— 结束参数校验 ——
     manager.history.rewrite(path, name, email, author, yes)

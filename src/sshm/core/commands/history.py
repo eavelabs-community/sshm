@@ -23,6 +23,7 @@ from ...ui.output import (
 from ...ui.output import (
     print as rich_print,
 )
+from ..errors import ErrCode
 from ...ui.output import (
     section as print_section_header,
 )
@@ -77,7 +78,7 @@ class HistoryCommands:
 
         repo_path = Path(repo_path).resolve()
         if not (repo_path / ".git").exists():
-            self.m._fail("NOT_GIT_REPO", path=repo_path)
+            self.m._fail(ErrCode.NOT_GIT_REPO, path=repo_path)
             return
 
         old_name, new_name = self._split_pair(name)
@@ -91,11 +92,11 @@ class HistoryCommands:
 
         # 互斥校验：精细替换不能与任何全量刷新混用
         if precise and (full_author or full_name or full_email):
-            self.m._fail("AUTHOR_EXCLUSIVE", hint=_(K.err.rewrite_usage_tip))
+            self.m._fail(ErrCode.AUTHOR_EXCLUSIVE, hint=_(K.err.rewrite_usage_tip))
             return
         # --author 不能与 --name/--email 单值全量混用
         if full_author and (full_name or full_email):
-            self.m._fail("AUTHOR_EXCLUSIVE", hint=_(K.err.rewrite_usage_tip))
+            self.m._fail(ErrCode.AUTHOR_EXCLUSIVE, hint=_(K.err.rewrite_usage_tip))
             return
 
         if author:
@@ -111,7 +112,7 @@ class HistoryCommands:
             new_name = stored.get("name") or None
             new_email = stored.get("email") or None
             if not new_name and not new_email:
-                self.m._fail("AUTHOR_EMPTY", label=author)
+                self.m._fail(ErrCode.AUTHOR_EMPTY, label=author)
                 return
         elif full_name or full_email:
             # 单值全量刷新：match_all 模式，只刷新提供的字段
@@ -119,10 +120,10 @@ class HistoryCommands:
         else:
             match_all = False
             if not old_name and not old_email:
-                self.m._fail("NEED_OLD", hint=_(K.err.rewrite_usage_tip))
+                self.m._fail(ErrCode.NEED_OLD, hint=_(K.err.rewrite_usage_tip))
                 return
             if not new_name and not new_email:
-                self.m._fail("NEED_NEW")
+                self.m._fail(ErrCode.NEED_NEW)
                 return
 
         print_section_header(_(K.hdr.rewrite))
@@ -175,7 +176,7 @@ class HistoryCommands:
         except Exception:
             matched = 0
         if matched == 0:
-            self.m._fail("NO_MATCHES", icon=ICON_WARN)
+            self.m._fail(ErrCode.NO_MATCHES, icon=ICON_WARN)
             return
         rich_print(f"📝  {_(K.msg.will_rewrite_count, count=matched)}")
 
@@ -191,7 +192,7 @@ class HistoryCommands:
             with output_status(_(K.msg.rewriting)):
                 result = rewrite_history(repo_path, cfg)
         except Exception as e:
-            self.m._fail("REWRITE_FAILED", err=e)
+            self.m._fail(ErrCode.REWRITE_FAILED, err=e)
             return
 
         rich_print(f"\n✅ {_(K.msg.history_rewritten)}")

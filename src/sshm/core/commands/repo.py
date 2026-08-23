@@ -34,6 +34,7 @@ from ...ui.output import (
     table as print_table,
 )
 from ...ui.tip import render_tip_block
+from ..errors import ErrCode
 from ..services.ssh.keypaths import private_key_path, public_key_path
 
 if TYPE_CHECKING:
@@ -51,7 +52,7 @@ class RepoCommands:
         repo_path = Path(repo_path).resolve()
 
         if not (repo_path / ".git").exists():
-            self.m._fail("NOT_GIT_REPO", path=repo_path)
+            self.m._fail(ErrCode.NOT_GIT_REPO, path=repo_path)
             return
 
         key_type = self.m.keystore.detect_key_type_for_label(label)
@@ -77,7 +78,7 @@ class RepoCommands:
 
             parsed = self.m.gitrepo.parse_git_url(current_url)
             if not parsed:
-                self.m._fail("FAILED_PARSE")
+                self.m._fail(ErrCode.FAILED_PARSE)
                 return
 
             platform, user, repo = parsed
@@ -138,13 +139,13 @@ class RepoCommands:
 
         except subprocess.CalledProcessError as e:
             if "No such remote" in str(e.stderr):
-                self.m._fail("NO_ORIGIN_REMOTE")
+                self.m._fail(ErrCode.NO_ORIGIN_REMOTE)
             else:
-                self.m._fail("GIT_FAILED", err=e)
+                self.m._fail(ErrCode.GIT_FAILED, err=e)
         except subprocess.TimeoutExpired:
-            self.m._fail("SSH_TEST_TIMEOUT")
+            self.m._fail(ErrCode.SSH_TEST_TIMEOUT)
         except Exception as e:
-            self.m._fail("GIT_FAILED", err=e)
+            self.m._fail(ErrCode.GIT_FAILED, err=e)
 
     def clone(
         self,
@@ -157,13 +158,13 @@ class RepoCommands:
         # 校验标签存在密钥
         key_type = self.m.keystore.detect_key_type_for_label(label)
         if not key_type:
-            self.m._fail("KEY_NOT_FOUND_SHORT", label=label)
+            self.m._fail(ErrCode.KEY_NOT_FOUND_SHORT, label=label)
             return
 
         # 解析 URL
         parsed = self.m.gitrepo.parse_git_url(url)
         if not parsed:
-            self.m._fail("FAILED_PARSE")
+            self.m._fail(ErrCode.FAILED_PARSE)
             return
         _platform, user, repo = parsed
         repo_name = repo.rstrip(".git") or repo
@@ -200,7 +201,7 @@ class RepoCommands:
             subprocess.run(clone_args, check=True)
         except subprocess.CalledProcessError as e:
             detail = (e.stderr or b"").decode("utf-8", "replace").strip() or str(e)
-            self.m._fail("CLONE_FAILED", err=detail)
+            self.m._fail(ErrCode.CLONE_FAILED, err=detail)
             return
 
         # 克隆完成后定位仓库目录（用于后续 author 设置）
@@ -230,7 +231,7 @@ class RepoCommands:
         repo_path = Path(repo_path).resolve()
 
         if not (repo_path / ".git").exists():
-            self.m._fail("NOT_VALID_GIT", path=repo_path)
+            self.m._fail(ErrCode.NOT_VALID_GIT, path=repo_path)
             return
 
         print(f"{_(K.lbl.repo_path)} {repo_path}")
@@ -306,9 +307,9 @@ class RepoCommands:
             if "No such remote" in str(e.stderr):
                 print("\n⚠️  " + _(K.msg.no_origin_configured))
             else:
-                self.m._fail("GIT_FAILED", err=e)
+                self.m._fail(ErrCode.GIT_FAILED, err=e)
         except Exception as e:
-            self.m._fail("GIT_FAILED", err=e)
+            self.m._fail(ErrCode.GIT_FAILED, err=e)
 
     def test(
         self,
@@ -322,7 +323,7 @@ class RepoCommands:
 
             keys_by_label = self.m.keystore.scan_all_keys()
             if not keys_by_label:
-                self.m._fail("NO_KEYS", hint=_(K.msg.use_all_keys_tip))
+                self.m._fail(ErrCode.NO_KEYS, hint=_(K.msg.use_all_keys_tip))
                 return
 
             results = []
@@ -416,7 +417,7 @@ class RepoCommands:
             repo_path = Path(repo_path).resolve()
 
             if not (repo_path / ".git").exists():
-                self.m._fail("NOT_VALID_GIT", path=repo_path)
+                self.m._fail(ErrCode.NOT_VALID_GIT, path=repo_path)
                 return
 
             print(f"{_(K.lbl.repo_path)} {repo_path}")
@@ -453,6 +454,6 @@ class RepoCommands:
                 if "No such remote" in str(e.stderr):
                     print("\n⚠️  " + _(K.msg.no_origin_configured))
                 else:
-                    self.m._fail("GIT_FAILED", err=e)
+                    self.m._fail(ErrCode.GIT_FAILED, err=e)
             except Exception as e:
-                self.m._fail("GIT_FAILED", err=e)
+                self.m._fail(ErrCode.GIT_FAILED, err=e)

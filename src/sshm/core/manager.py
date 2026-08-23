@@ -98,21 +98,23 @@ class SSHKeyManager:
         """记录业务失败并渲染统一错误（不抛异常，保持原有控制流）。
 
         支持两种调用形式（与 SSHMError 对齐，逐步迁移到错误码）：
-        1. 错误码：_fail("KEY_NOT_FOUND", label="x")
+        1. 错误码：_fail(ErrCode.KEY_NOT_FOUND, label="x")
            - 从 ERROR_REGISTRY 解析 msg_key + 默认 hint_key，自动 i18n + 格式化；
            - 默认 hint 自动注入，调用点无需手写 hint 字符串。
         2. 纯消息（遗留兼容）：_fail("some message", hint=...)
            - 直接走 render_business_error，行为与旧版一致。
 
         Args:
-            msg_or_code: 错误消息（不含图标前缀）或 ERROR_REGISTRY 中的错误码。
+            msg_or_code: 错误消息（不含图标前缀）、ErrCode 枚举成员，
+                或 ERROR_REGISTRY 中的错误码字符串。
             icon: 状态图标，默认 ❌（硬错误）；软告警传 ⚠️。错误码形式为 False 时忽略。
             hint: 可选建议行，覆盖错误码默认值。
             **params: 错误码消息模板所需的格式化参数。
         """
-        from .errors import ERROR_REGISTRY
+        from .errors import ERROR_REGISTRY, ErrCode, _code_key
 
-        if isinstance(msg_or_code, str) and msg_or_code in ERROR_REGISTRY:
+        code = _code_key(msg_or_code)
+        if isinstance(msg_or_code, ErrCode) or (isinstance(msg_or_code, str) and code in ERROR_REGISTRY):
             spec = ERROR_REGISTRY[msg_or_code]
             msg = _(spec.msg_key).format(**params)
             hint = hint or (_(spec.hint_key).format(**params) if spec.hint_key else None)
