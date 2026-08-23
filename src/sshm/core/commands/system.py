@@ -150,8 +150,15 @@ class SystemCommands:
         success = updater.download_and_update(update_info["download_url"])
         return 0 if success else 1
 
-    def add_to_path(self) -> None:
-        """把当前可执行文件目录添加到系统 PATH"""
+    def add_to_path(self) -> int:
+        """把当前可执行文件目录添加到系统 PATH。
+
+        失败或用户取消时标记软错误，保证退出码非 0。
+        """
         from ..services.ssh.path import add_to_path
 
-        add_to_path()
+        ok = add_to_path()
+        if not ok:
+            self.m._mark_error()
+            return 1
+        return 0

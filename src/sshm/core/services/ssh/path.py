@@ -14,8 +14,12 @@ from ....ui.output import print
 from ....ui.tip import render_business_error
 
 
-def add_to_path() -> None:
-    """将当前可执行文件路径添加到环境变量"""
+def add_to_path() -> bool:
+    """将当前可执行文件路径添加到环境变量。
+
+    Returns:
+        True 成功 / False 失败或用户取消。由命令层据此上报错误，保证退出码正确。
+    """
     print_section_header(_(K.hdr.add_to_path))
 
     # 获取当前可执行文件路径
@@ -32,13 +36,16 @@ def add_to_path() -> None:
     print(f"{_(K.sys.directory, dir=exe_dir)}")
 
     if sys.platform == "win32":
-        _add_to_windows_path(exe_dir)
-    else:
-        _add_to_unix_path(exe_dir)
+        return _add_to_windows_path(exe_dir)
+    return _add_to_unix_path(exe_dir)
 
 
-def _add_to_windows_path(exe_dir: Path) -> None:
-    """Windows 环境变量配置"""
+def _add_to_windows_path(exe_dir: Path) -> bool:
+    """Windows 环境变量配置。
+
+    Returns:
+        True 成功 / False 失败或用户取消。
+    """
     import winreg
 
     try:
@@ -88,8 +95,10 @@ def _add_to_windows_path(exe_dir: Path) -> None:
                 else:
                     render_business_error(_(K.misc.operation_cancelled))
                     winreg.CloseKey(key)
+                    return False
             else:
                 winreg.CloseKey(key)
+            return True
         else:
             # 添加新路径到开头
             path_entries.insert(0, exe_dir_str)
@@ -105,15 +114,22 @@ def _add_to_windows_path(exe_dir: Path) -> None:
             print(f"   {exe_dir_str}")
             print("\n💡 " + _(K.sys.restart_tip))
             print("   " + _(K.sys.use_sshm_directly))
+            return True
 
     except PermissionError:
         render_business_error(_(K.err.permission_denied))
+        return False
     except Exception as e:
         render_business_error(_(K.err.add_failed, err=e))
+        return False
 
 
-def _add_to_unix_path(exe_dir: Path) -> None:
-    """Unix/Linux/macOS 环境变量配置"""
+def _add_to_unix_path(exe_dir: Path) -> bool:
+    """Unix/Linux/macOS 环境变量配置。
+
+    Returns:
+        True 成功 / False 失败或用户取消。
+    """
     home = Path.home()
     exe_dir_str = str(exe_dir)
 
@@ -133,7 +149,7 @@ def _add_to_unix_path(exe_dir: Path) -> None:
         content = rc_file.read_text(encoding="utf-8")
         if exe_dir_str in content:
             print(_(K.sys.path_in, name=rc_file.name))
-            return
+            return True
 
     print(_(K.sys.will_add, path=rc_file))
     print(_(K.sys.command, cmd=export_line))
@@ -148,10 +164,13 @@ def _add_to_unix_path(exe_dir: Path) -> None:
             print("\n💡 " + _(K.sys.run_to_apply))
             print(f"   source {rc_file}")
             print("\n   " + _(K.sys.or_restart))
+            return True
         except Exception as e:
             render_business_error(_(K.err.add_failed, err=e))
+            return False
     else:
         render_business_error(_(K.misc.operation_cancelled))
+        return False
 
 
 def _broadcast_env_change() -> None:
