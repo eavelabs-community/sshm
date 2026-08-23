@@ -69,7 +69,7 @@ sshm config update
 sshm key list
 
 # 如果有新版本，会在输出前显示提示：
-# 💡 有新版本可用: v2.2.0 (当前: v0.0.5)
+# 💡 有新版本可用: v0.0.6 (当前: v0.0.5)
 #    运行 'sshm config update' 更新到最新版本
 ```
 
