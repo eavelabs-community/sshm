@@ -166,9 +166,7 @@ def test_custom_converter_is_extensible():
         def __init__(self, name: str):
             self.name = name
 
-    register_error_code_converter(
-        MyCode, lambda c: convert_error_code.__globals__["_CodeConversion"](c.name, c.name in ERROR_REGISTRY)
-    )
+    register_error_code_converter(MyCode, lambda c: convert_error_code.__globals__["_CodeConversion"](c.name, c.name in ERROR_REGISTRY))
     try:
         conv = convert_error_code(MyCode("KEY_NOT_FOUND"))
         assert conv.key == "KEY_NOT_FOUND"

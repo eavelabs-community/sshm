@@ -268,12 +268,7 @@ class AuthorCommands:
                 continue
             other_name = (info.get("name") or "").lower()
             other_email = (info.get("email") or "").lower()
-            if (
-                final_name
-                and final_email
-                and other_name == final_name.lower()
-                and other_email == final_email.lower()
-            ):
+            if final_name and final_email and other_name == final_name.lower() and other_email == final_email.lower():
                 dup_label = other_label
                 break
         if dup_label is not None:
@@ -367,11 +362,7 @@ class AuthorCommands:
             info = authors[label]
             name = info.get("name") or ""
             email = info.get("email") or ""
-            is_active = (
-                eff_has_both
-                and bool(name and name.lower() == eff_name_lower)
-                and bool(email and email.lower() == eff_email_lower)
-            )
+            is_active = eff_has_both and bool(name and name.lower() == eff_name_lower) and bool(email and email.lower() == eff_email_lower)
             if is_active:
                 matched_any = True
             icon = "📍" if is_active else ""

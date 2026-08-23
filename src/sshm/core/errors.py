@@ -295,20 +295,13 @@ def convert_error_code(raw: "Any") -> "_CodeConversion":
     """
     converter = _ERROR_CODE_CONVERTERS.get(type(raw))
     if converter is None:
-        raise TypeError(
-            f"不支持的错误码类型: {type(raw).__name__}（值={raw!r}）；"
-            f"如需支持请 register_error_code_converter({type(raw).__name__}, ...)"
-        )
+        raise TypeError(f"不支持的错误码类型: {type(raw).__name__}（值={raw!r}）；如需支持请 register_error_code_converter({type(raw).__name__}, ...)")
     return converter(raw)
 
 
 # --- 内置转换器 ---
-register_error_code_converter(
-    ErrCode, lambda c: _CodeConversion(c.value, c.value in ERROR_REGISTRY)
-)
-register_error_code_converter(
-    str, lambda s: _CodeConversion(s, s in ERROR_REGISTRY)
-)
+register_error_code_converter(ErrCode, lambda c: _CodeConversion(c.value, c.value in ERROR_REGISTRY))
+register_error_code_converter(str, lambda s: _CodeConversion(s, s in ERROR_REGISTRY))
 
 
 def resolve_error(exc: SSHMError) -> tuple[str, str | None, int, bool]:
