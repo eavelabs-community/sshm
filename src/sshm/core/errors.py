@@ -17,8 +17,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from sshm.i18n import _
 
@@ -28,6 +30,9 @@ __all__ = [
     "ValidationError",
     "ErrorSpec",
     "ERROR_REGISTRY",
+    "convert_error_code",
+    "register_error_code_converter",
+    "_CodeConversion",
     "resolve_error",
 ]
 
@@ -128,16 +133,16 @@ class SSHMError(Exception):
     exit_code = 1
 
     def __init__(self, code: "str | ErrCode", **params):
-        norm = _code_key(code)
+        conv = convert_error_code(code)
         # 文本式兼容：若 code 不是已知错误码，视为裸消息
-        if norm not in ERROR_REGISTRY:
-            super().__init__(norm)
+        if not conv.known:
+            super().__init__(conv.key)
             self.code = None
             self.params: dict = {}
             return
-        spec = ERROR_REGISTRY[norm]
-        super().__init__(norm)
-        self.code = norm
+        spec = ERROR_REGISTRY[conv.key]
+        super().__init__(conv.key)
+        self.code = conv.key
         self.params = params
         self.exit_code = spec.exit_code
         self.is_warn = spec.warn
@@ -178,98 +183,132 @@ class ErrorSpec:
 # 错误码命名规则：err.<name> -> 错误码 <NAME>（大写、去点）。
 # 迁移旧式调用 self.m._fail(OLD_MSG) 时，msg 部分替换为 "X_CODE"，hint 仍可按需在调用点显式传入。
 # 此处仅登记 msg_key（保证渲染入口统一）；带通用默认 hint 的显式绑定 hint_key。
-ERROR_REGISTRY: dict[str, ErrorSpec] = {
+_RAW_SPECS: dict[ErrCode, ErrorSpec] = {
     # --- 通用 ---
-    "KEY_NOT_FOUND": ErrorSpec(ErrCode.KEY_NOT_FOUND, "err.key_not_found", "msg.use_all_keys_tip"),
-    "KEY_NOT_FOUND_SHORT": ErrorSpec(ErrCode.KEY_NOT_FOUND_SHORT, "err.key_not_found_short", "msg.use_all_keys_tip"),
-    "KEY_NOT_FOUND_FILES": ErrorSpec(ErrCode.KEY_NOT_FOUND_FILES, "err.key_not_found_files", "msg.use_all_keys_tip"),
-    "KEY_NOT_FOUND_FILE": ErrorSpec(ErrCode.KEY_NOT_FOUND_FILE, "err.key_not_found_file", "msg.use_all_keys_tip"),
-    "KEY_EXISTS": ErrorSpec(ErrCode.KEY_EXISTS, "err.key_exists", None),
-    "KEY_MISSING": ErrorSpec(ErrCode.KEY_MISSING, "err.key_missing", None),
-    "DEFAULT_KEY_MISSING": ErrorSpec(ErrCode.DEFAULT_KEY_MISSING, "err.default_key_missing", None),
-    "NO_DEFAULT_KEY": ErrorSpec(ErrCode.NO_DEFAULT_KEY, "err.no_default_key", None),
-    "NO_KEYS": ErrorSpec(ErrCode.NO_KEYS, "err.no_keys", "msg.use_all_keys_tip"),
-    "LABEL_EMPTY": ErrorSpec(ErrCode.LABEL_EMPTY, "err.label_empty", None),
-    "LABEL_INVALID": ErrorSpec(ErrCode.LABEL_INVALID, "err.label_invalid", None),
-    "LABEL_RESERVED": ErrorSpec(ErrCode.LABEL_RESERVED, "err.label_reserved", None),
-    "LABEL_RESERVED_SWITCH": ErrorSpec(ErrCode.LABEL_RESERVED_SWITCH, "err.label_reserved_switch", None),
-    "LABEL_EXISTS": ErrorSpec(ErrCode.LABEL_EXISTS, "err.label_exists", None),
-    "TARGET_EXISTS": ErrorSpec(ErrCode.TARGET_EXISTS, "err.target_exists", None, warn=True),
-    "CANNOT_RENAME_DEFAULT": ErrorSpec(ErrCode.CANNOT_RENAME_DEFAULT, "err.cannot_rename_default", None),
-    "SAME_LABEL": ErrorSpec(ErrCode.SAME_LABEL, "err.same_label", None, warn=True),
-    "CREATE_FAILED": ErrorSpec(ErrCode.CREATE_FAILED, "err.create_failed", None),
-    "KEYGEN_TIMEOUT": ErrorSpec(ErrCode.KEYGEN_TIMEOUT, "err.keygen_timeout", None),
-    "INVALID_EMAIL": ErrorSpec(ErrCode.INVALID_EMAIL, "err.invalid_email", None),
-    "UNSUPPORTED_TYPE": ErrorSpec(ErrCode.UNSUPPORTED_TYPE, "err.unsupported_type", None),
+    ErrCode.KEY_NOT_FOUND: ErrorSpec(ErrCode.KEY_NOT_FOUND, "err.key_not_found", "msg.use_all_keys_tip"),
+    ErrCode.KEY_NOT_FOUND_SHORT: ErrorSpec(ErrCode.KEY_NOT_FOUND_SHORT, "err.key_not_found_short", "msg.use_all_keys_tip"),
+    ErrCode.KEY_NOT_FOUND_FILES: ErrorSpec(ErrCode.KEY_NOT_FOUND_FILES, "err.key_not_found_files", "msg.use_all_keys_tip"),
+    ErrCode.KEY_NOT_FOUND_FILE: ErrorSpec(ErrCode.KEY_NOT_FOUND_FILE, "err.key_not_found_file", "msg.use_all_keys_tip"),
+    ErrCode.KEY_EXISTS: ErrorSpec(ErrCode.KEY_EXISTS, "err.key_exists", None),
+    ErrCode.KEY_MISSING: ErrorSpec(ErrCode.KEY_MISSING, "err.key_missing", None),
+    ErrCode.DEFAULT_KEY_MISSING: ErrorSpec(ErrCode.DEFAULT_KEY_MISSING, "err.default_key_missing", None),
+    ErrCode.NO_DEFAULT_KEY: ErrorSpec(ErrCode.NO_DEFAULT_KEY, "err.no_default_key", None),
+    ErrCode.NO_KEYS: ErrorSpec(ErrCode.NO_KEYS, "err.no_keys", "msg.use_all_keys_tip"),
+    ErrCode.LABEL_EMPTY: ErrorSpec(ErrCode.LABEL_EMPTY, "err.label_empty", None),
+    ErrCode.LABEL_INVALID: ErrorSpec(ErrCode.LABEL_INVALID, "err.label_invalid", None),
+    ErrCode.LABEL_RESERVED: ErrorSpec(ErrCode.LABEL_RESERVED, "err.label_reserved", None),
+    ErrCode.LABEL_RESERVED_SWITCH: ErrorSpec(ErrCode.LABEL_RESERVED_SWITCH, "err.label_reserved_switch", None),
+    ErrCode.LABEL_EXISTS: ErrorSpec(ErrCode.LABEL_EXISTS, "err.label_exists", None),
+    ErrCode.TARGET_EXISTS: ErrorSpec(ErrCode.TARGET_EXISTS, "err.target_exists", None, warn=True),
+    ErrCode.CANNOT_RENAME_DEFAULT: ErrorSpec(ErrCode.CANNOT_RENAME_DEFAULT, "err.cannot_rename_default", None),
+    ErrCode.SAME_LABEL: ErrorSpec(ErrCode.SAME_LABEL, "err.same_label", None, warn=True),
+    ErrCode.CREATE_FAILED: ErrorSpec(ErrCode.CREATE_FAILED, "err.create_failed", None),
+    ErrCode.KEYGEN_TIMEOUT: ErrorSpec(ErrCode.KEYGEN_TIMEOUT, "err.keygen_timeout", None),
+    ErrCode.INVALID_EMAIL: ErrorSpec(ErrCode.INVALID_EMAIL, "err.invalid_email", None),
+    ErrCode.UNSUPPORTED_TYPE: ErrorSpec(ErrCode.UNSUPPORTED_TYPE, "err.unsupported_type", None),
     # --- 仓库 / git ---
-    "NOT_GIT_REPO": ErrorSpec(ErrCode.NOT_GIT_REPO, "err.not_git_repo", "err.run_in_repo"),
-    "NOT_VALID_GIT": ErrorSpec(ErrCode.NOT_VALID_GIT, "err.not_valid_git", None),
-    "RUN_IN_REPO": ErrorSpec(ErrCode.RUN_IN_REPO, "err.run_in_repo", None),
-    "FAILED_PARSE": ErrorSpec(ErrCode.FAILED_PARSE, "err.failed_parse", None),
-    "GIT_FAILED": ErrorSpec(ErrCode.GIT_FAILED, "err.git_failed", None),
-    "CLONE_FAILED": ErrorSpec(ErrCode.CLONE_FAILED, "err.clone_failed", None),
-    "NO_ORIGIN_REMOTE": ErrorSpec(ErrCode.NO_ORIGIN_REMOTE, "msg.no_origin_remote", "msg.add_remote_first"),
-    "SSH_TEST_TIMEOUT": ErrorSpec(ErrCode.SSH_TEST_TIMEOUT, "msg.ssh_test_timed_out", None, warn=True),
+    ErrCode.NOT_GIT_REPO: ErrorSpec(ErrCode.NOT_GIT_REPO, "err.not_git_repo", "err.run_in_repo"),
+    ErrCode.NOT_VALID_GIT: ErrorSpec(ErrCode.NOT_VALID_GIT, "err.not_valid_git", None),
+    ErrCode.RUN_IN_REPO: ErrorSpec(ErrCode.RUN_IN_REPO, "err.run_in_repo", None),
+    ErrCode.FAILED_PARSE: ErrorSpec(ErrCode.FAILED_PARSE, "err.failed_parse", None),
+    ErrCode.GIT_FAILED: ErrorSpec(ErrCode.GIT_FAILED, "err.git_failed", None),
+    ErrCode.CLONE_FAILED: ErrorSpec(ErrCode.CLONE_FAILED, "err.clone_failed", None),
+    ErrCode.NO_ORIGIN_REMOTE: ErrorSpec(ErrCode.NO_ORIGIN_REMOTE, "msg.no_origin_remote", "msg.add_remote_first"),
+    ErrCode.SSH_TEST_TIMEOUT: ErrorSpec(ErrCode.SSH_TEST_TIMEOUT, "msg.ssh_test_timed_out", None, warn=True),
     # --- 备份 ---
-    "NO_BACKUPS_RESTORE": ErrorSpec(ErrCode.NO_BACKUPS_RESTORE, "err.no_backups_restore", None),
-    "USE_BACKUP_CMD": ErrorSpec(ErrCode.USE_BACKUP_CMD, "err.use_backup_cmd", None),
-    "USE_BACKUPS_CMD": ErrorSpec(ErrCode.USE_BACKUPS_CMD, "err.use_backups_cmd", None),
-    "INVALID_BACKUP_NAME": ErrorSpec(ErrCode.INVALID_BACKUP_NAME, "err.invalid_backup_name", None),
-    "BACKUP_NOT_FOUND_PATH": ErrorSpec(ErrCode.BACKUP_NOT_FOUND_PATH, "err.backup_not_found_path", "err.use_backups_cmd"),
-    "NO_RECOVERABLE": ErrorSpec(ErrCode.NO_RECOVERABLE, "err.no_recoverable", None),
-    "RESTORE_FAILED_DETAIL": ErrorSpec(ErrCode.RESTORE_FAILED_DETAIL, "err.restore_failed_detail", None),
-    "OPERATION_CANCELLED": ErrorSpec(ErrCode.OPERATION_CANCELLED, "err.operation_cancelled", None),
-    "DELETE_DEFAULT": ErrorSpec(ErrCode.DELETE_DEFAULT, "err.delete_default", None),
-    "DELETE_ALL_DEFAULT": ErrorSpec(ErrCode.DELETE_ALL_DEFAULT, "err.delete_all_default", None),
+    ErrCode.NO_BACKUPS_RESTORE: ErrorSpec(ErrCode.NO_BACKUPS_RESTORE, "err.no_backups_restore", None),
+    ErrCode.USE_BACKUP_CMD: ErrorSpec(ErrCode.USE_BACKUP_CMD, "err.use_backup_cmd", None),
+    ErrCode.USE_BACKUPS_CMD: ErrorSpec(ErrCode.USE_BACKUPS_CMD, "err.use_backups_cmd", None),
+    ErrCode.INVALID_BACKUP_NAME: ErrorSpec(ErrCode.INVALID_BACKUP_NAME, "err.invalid_backup_name", None),
+    ErrCode.BACKUP_NOT_FOUND_PATH: ErrorSpec(ErrCode.BACKUP_NOT_FOUND_PATH, "err.backup_not_found_path", "err.use_backups_cmd"),
+    ErrCode.NO_RECOVERABLE: ErrorSpec(ErrCode.NO_RECOVERABLE, "err.no_recoverable", None),
+    ErrCode.RESTORE_FAILED_DETAIL: ErrorSpec(ErrCode.RESTORE_FAILED_DETAIL, "err.restore_failed_detail", None),
+    ErrCode.OPERATION_CANCELLED: ErrorSpec(ErrCode.OPERATION_CANCELLED, "err.operation_cancelled", None),
+    ErrCode.DELETE_DEFAULT: ErrorSpec(ErrCode.DELETE_DEFAULT, "err.delete_default", None),
+    ErrCode.DELETE_ALL_DEFAULT: ErrorSpec(ErrCode.DELETE_ALL_DEFAULT, "err.delete_all_default", None),
     # --- 作者 ---
-    "NO_AUTHOR_SET": ErrorSpec(ErrCode.NO_AUTHOR_SET, "err.no_author_set", None),
-    "AUTHOR_EXCLUSIVE": ErrorSpec(ErrCode.AUTHOR_EXCLUSIVE, "err.author_exclusive", "err.rewrite_usage_tip"),
-    "AUTHOR_NOT_FOUND": ErrorSpec(ErrCode.AUTHOR_NOT_FOUND, "err.author_not_found", None),
-    "AUTHOR_DUP_ID": ErrorSpec(ErrCode.AUTHOR_DUP_ID, "err.author_dup_identity", "err.author_dup_hint"),
-    "USE_AUTHOR_LIST": ErrorSpec(ErrCode.USE_AUTHOR_LIST, "err.use_author_list", None),
-    "NO_AUTHORS": ErrorSpec(ErrCode.NO_AUTHORS, "err.no_authors", None),
-    "ADD_AUTHOR_USAGE": ErrorSpec(ErrCode.ADD_AUTHOR_USAGE, "err.add_author_usage", None),
-    "AUTHOR_EMPTY": ErrorSpec(ErrCode.AUTHOR_EMPTY, "err.author_empty", None),
-    "AUTO_AUTHOR_FAILED": ErrorSpec(ErrCode.AUTO_AUTHOR_FAILED, "err.auto_author_failed", None),
+    ErrCode.NO_AUTHOR_SET: ErrorSpec(ErrCode.NO_AUTHOR_SET, "err.no_author_set", None),
+    ErrCode.AUTHOR_EXCLUSIVE: ErrorSpec(ErrCode.AUTHOR_EXCLUSIVE, "err.author_exclusive", "err.rewrite_usage_tip"),
+    ErrCode.AUTHOR_NOT_FOUND: ErrorSpec(ErrCode.AUTHOR_NOT_FOUND, "err.author_not_found", None),
+    ErrCode.AUTHOR_DUP_ID: ErrorSpec(ErrCode.AUTHOR_DUP_ID, "err.author_dup_identity", "err.author_dup_hint"),
+    ErrCode.USE_AUTHOR_LIST: ErrorSpec(ErrCode.USE_AUTHOR_LIST, "err.use_author_list", None),
+    ErrCode.NO_AUTHORS: ErrorSpec(ErrCode.NO_AUTHORS, "err.no_authors", None),
+    ErrCode.ADD_AUTHOR_USAGE: ErrorSpec(ErrCode.ADD_AUTHOR_USAGE, "err.add_author_usage", None),
+    ErrCode.AUTHOR_EMPTY: ErrorSpec(ErrCode.AUTHOR_EMPTY, "err.author_empty", None),
+    ErrCode.AUTO_AUTHOR_FAILED: ErrorSpec(ErrCode.AUTO_AUTHOR_FAILED, "err.auto_author_failed", None),
     # --- history rewrite ---
-    "REWRITE_USAGE": ErrorSpec(ErrCode.REWRITE_USAGE, "err.author_exclusive", "err.rewrite_usage_tip"),
-    "NEED_OLD": ErrorSpec(ErrCode.NEED_OLD, "err.need_old", "err.rewrite_usage_tip"),
-    "NEED_NEW": ErrorSpec(ErrCode.NEED_NEW, "err.need_new", "err.rewrite_usage_tip"),
-    "NO_MATCHES": ErrorSpec(ErrCode.NO_MATCHES, "err.no_matches", None, warn=True),
-    "REWRITE_FAILED": ErrorSpec(ErrCode.REWRITE_FAILED, "err.rewrite_failed", None),
+    ErrCode.REWRITE_USAGE: ErrorSpec(ErrCode.REWRITE_USAGE, "err.author_exclusive", "err.rewrite_usage_tip"),
+    ErrCode.NEED_OLD: ErrorSpec(ErrCode.NEED_OLD, "err.need_old", "err.rewrite_usage_tip"),
+    ErrCode.NEED_NEW: ErrorSpec(ErrCode.NEED_NEW, "err.need_new", "err.rewrite_usage_tip"),
+    ErrCode.NO_MATCHES: ErrorSpec(ErrCode.NO_MATCHES, "err.no_matches", None, warn=True),
+    ErrCode.REWRITE_FAILED: ErrorSpec(ErrCode.REWRITE_FAILED, "err.rewrite_failed", None),
     # --- 连接 / 网络 ---
-    "CONNECTION_FAILED": ErrorSpec(ErrCode.CONNECTION_FAILED, "err.connection_failed", None),
-    "CONNECTION_TIMEOUT": ErrorSpec(ErrCode.CONNECTION_TIMEOUT, "err.connection_timeout", None, warn=True),
-    "SSH_NOT_FOUND": ErrorSpec(ErrCode.SSH_NOT_FOUND, "err.ssh_not_found", None),
-    "PERMISSION_DENIED": ErrorSpec(ErrCode.PERMISSION_DENIED, "err.permission_denied", None),
-    "ADD_FAILED": ErrorSpec(ErrCode.ADD_FAILED, "err.add_failed", None),
+    ErrCode.CONNECTION_FAILED: ErrorSpec(ErrCode.CONNECTION_FAILED, "err.connection_failed", None),
+    ErrCode.CONNECTION_TIMEOUT: ErrorSpec(ErrCode.CONNECTION_TIMEOUT, "err.connection_timeout", None, warn=True),
+    ErrCode.SSH_NOT_FOUND: ErrorSpec(ErrCode.SSH_NOT_FOUND, "err.ssh_not_found", None),
+    ErrCode.PERMISSION_DENIED: ErrorSpec(ErrCode.PERMISSION_DENIED, "err.permission_denied", None),
+    ErrCode.ADD_FAILED: ErrorSpec(ErrCode.ADD_FAILED, "err.add_failed", None),
     # --- CLI ---
-    "NO_SUCH_COMMAND": ErrorSpec(ErrCode.NO_SUCH_COMMAND, "err.no_such_command", None),
-    "NO_SUCH_SUBCOMMAND": ErrorSpec(ErrCode.NO_SUCH_SUBCOMMAND, "err.no_such_subcommand", None),
+    ErrCode.NO_SUCH_COMMAND: ErrorSpec(ErrCode.NO_SUCH_COMMAND, "err.no_such_command", None),
+    ErrCode.NO_SUCH_SUBCOMMAND: ErrorSpec(ErrCode.NO_SUCH_SUBCOMMAND, "err.no_such_subcommand", None),
 }
 
+# 对外查表用 str key：ErrCode 继承 str 但哈希与裸字符串不等，故推导为字符串表；
+# 此处由枚举严格推导，保证 ERROR_REGISTRY 的 key 与 _RAW_SPECS 一一对应（单一事实来源）。
+ERROR_REGISTRY: dict[str, ErrorSpec] = {code.value: spec for code, spec in _RAW_SPECS.items()}
 
-def _validate_registry() -> None:
-    """保证 ErrCode 与 ERROR_REGISTRY 一一对应（单一事实来源约束）。
 
-    任一侧新增/删除/改名未同步都会在此抛错，CI 与启动即可发现。
+# --------------------------------------------------------------------------
+# 错误码转换器分派（可扩展：每种输入类型注册一个转换器）
+# --------------------------------------------------------------------------
+@dataclass(frozen=True)
+class _CodeConversion:
+    """错误码归一化结果。
+
+    Attributes:
+        key: 归一化后的字符串 key（查 ERROR_REGISTRY / 透传消息都用它）。
+        known: 是否为已登记的错误码（False 表示文本式裸消息，需透传）。
     """
-    code_names = {c.value for c in ErrCode}
-    reg_names = set(ERROR_REGISTRY)
-    missing = code_names - reg_names
-    extra = reg_names - code_names
-    assert not missing, f"ErrCode 有但未登记到 ERROR_REGISTRY: {sorted(missing)}"
-    assert not extra, f"ERROR_REGISTRY 有但 ErrCode 未定义: {sorted(extra)}"
-    for code, spec in ERROR_REGISTRY.items():
-        assert spec.code == code, f"注册表 {code} 的 ErrorSpec.code 不一致: {spec.code}"
+
+    key: str
+    known: bool
 
 
-_validate_registry()
+_ERROR_CODE_CONVERTERS: dict[type, "Callable[[Any], _CodeConversion]"] = {}
 
 
-def _code_key(code: "str | ErrCode") -> str:
-    """归一化错误码：枚举转其字符串值，字符串原样返回。"""
-    return code.value if isinstance(code, ErrCode) else code
+def register_error_code_converter(tp: type, fn: "Callable[[Any], _CodeConversion]") -> None:
+    """注册某类型的错误码转换器（可扩展点）。
+
+    例如未来支持 int / 自定义错误对象，只需在此注册，无需改动 SSHMError / _fail。
+    """
+    _ERROR_CODE_CONVERTERS[tp] = fn
+
+
+def convert_error_code(raw: "Any") -> "_CodeConversion":
+    """将任意错误码输入归一化为 (_CodeConversion)。
+
+    按输入类型分派到已注册的转换器：
+    - ErrCode 枚举 -> 取 .value，是否已知由注册表查表决定（漏登记也会报警）；
+    - str         -> 原样透传，是否已知由注册表查表决定；
+    - 其他类型    -> 抛 TypeError，提示需注册转换器（可扩展）。
+    """
+    converter = _ERROR_CODE_CONVERTERS.get(type(raw))
+    if converter is None:
+        raise TypeError(
+            f"不支持的错误码类型: {type(raw).__name__}（值={raw!r}）；"
+            f"如需支持请 register_error_code_converter({type(raw).__name__}, ...)"
+        )
+    return converter(raw)
+
+
+# --- 内置转换器 ---
+register_error_code_converter(
+    ErrCode, lambda c: _CodeConversion(c.value, c.value in ERROR_REGISTRY)
+)
+register_error_code_converter(
+    str, lambda s: _CodeConversion(s, s in ERROR_REGISTRY)
+)
 
 
 def resolve_error(exc: SSHMError) -> tuple[str, str | None, int, bool]:

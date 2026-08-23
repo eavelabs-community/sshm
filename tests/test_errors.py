@@ -11,9 +11,12 @@ import pytest
 
 from sshm.core.errors import (
     ERROR_REGISTRY,
+    ErrCode,
     ErrorSpec,
     SSHMError,
     ValidationError,
+    convert_error_code,
+    register_error_code_converter,
     resolve_error,
 )
 from sshm.core.manager import SSHKeyManager
@@ -133,3 +136,47 @@ def test_registry_codes_resolve_without_error():
         assert "{" not in msg, f"{code} 消息仍有未填充占位符: {msg}"
         if hint:
             assert "{" not in hint, f"{code} hint 仍有未填充占位符: {hint}"
+
+
+def test_enum_and_string_code_equivalence():
+    """ErrCode 枚举与同名字符串应被归一化为同一 key，且都能命中注册表。"""
+    from sshm.core.manager import SSHKeyManager
+
+    e = SSHMError(ErrCode.KEY_NOT_FOUND, label="x")
+    s = SSHMError("KEY_NOT_FOUND", label="x")
+    assert e.code == s.code == "KEY_NOT_FOUND"
+    me, ms = resolve_error(e), resolve_error(s)
+    assert me[0] == ms[0] and me[3] == ms[3]
+
+    m = SSHKeyManager()
+    m._fail(ErrCode.KEY_NOT_FOUND, label="x")
+    assert m._had_error is True
+
+
+def test_unknown_code_type_raises_type_error():
+    """未注册转换器类型应抛 TypeError，提示可扩展注册。"""
+    with pytest.raises(TypeError):
+        convert_error_code(12345)
+
+
+def test_custom_converter_is_extensible():
+    """可扩展点：注册自定义类型转换器后，convert_error_code 走新路径。"""
+
+    class MyCode:
+        def __init__(self, name: str):
+            self.name = name
+
+    register_error_code_converter(
+        MyCode, lambda c: convert_error_code.__globals__["_CodeConversion"](c.name, c.name in ERROR_REGISTRY)
+    )
+    try:
+        conv = convert_error_code(MyCode("KEY_NOT_FOUND"))
+        assert conv.key == "KEY_NOT_FOUND"
+        assert conv.known is True
+        conv2 = convert_error_code(MyCode("totally unknown"))
+        assert conv2.known is False
+    finally:
+        # 清理，避免污染其他测试
+        from sshm.core.errors import _ERROR_CODE_CONVERTERS
+
+        _ERROR_CODE_CONVERTERS.pop(MyCode, None)

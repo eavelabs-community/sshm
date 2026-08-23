@@ -111,16 +111,16 @@ class SSHKeyManager:
             hint: 可选建议行，覆盖错误码默认值。
             **params: 错误码消息模板所需的格式化参数。
         """
-        from .errors import ERROR_REGISTRY, ErrCode, _code_key
+        from .errors import ERROR_REGISTRY, convert_error_code
 
-        code = _code_key(msg_or_code)
-        if isinstance(msg_or_code, ErrCode) or (isinstance(msg_or_code, str) and code in ERROR_REGISTRY):
-            spec = ERROR_REGISTRY[msg_or_code]
+        conv = convert_error_code(msg_or_code)
+        if conv.known:
+            spec = ERROR_REGISTRY[conv.key]
             msg = _(spec.msg_key).format(**params)
             hint = hint or (_(spec.hint_key).format(**params) if spec.hint_key else None)
             icon = ICON_WARN if spec.warn else ICON_ERR
         else:
-            msg = msg_or_code  # 兼容纯消息
+            msg = conv.key  # 兼容纯消息（文本式透传）
 
         self._had_error = True
         render_business_error(msg, icon=icon, hint=hint)
