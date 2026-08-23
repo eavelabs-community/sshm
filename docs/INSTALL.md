@@ -36,7 +36,7 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 
 ```powershell
 # 指定版本安装
-powershell -ExecutionPolicy Bypass -File .\install.ps1 -Version v0.0.4
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -Version v0.0.5
 
 # 指定安装目录
 powershell -ExecutionPolicy Bypass -File .\install.ps1 -InstallDir "C:\Tools\sshm"
@@ -70,7 +70,7 @@ chmod +x install.sh
 ./install.sh
 
 # 指定版本安装
-./install.sh --version v0.0.4
+./install.sh --version v0.0.5
 
 # 指定安装目录
 ./install.sh --install-dir ~/.local/bin

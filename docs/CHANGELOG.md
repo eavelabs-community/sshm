@@ -18,6 +18,22 @@
 
 ---
 
+## [0.0.5] - 2026-08-23
+
+### ✨ 重构与改进
+
+- **错误码枚举化（单一事实来源）**：新增 `ErrCode(str, Enum)` 枚举，值即错误码字符串；继承 `str` 使 `ErrCode.X == "X"` 为真，向后兼容任何遗留字符串比较。注册表 `_RAW_SPECS: dict[ErrCode, ErrorSpec]` 的 key 与 `ErrorSpec` 首参均引用枚举成员，彻底消除调用点与注册表的双重硬编码；`ERROR_REGISTRY` 由枚举严格推导为 `str` key（`ErrCode` 哈希与裸字符串不等，故保持查表用 str key）
+- **可扩展错误码转换器分派**：新增 `convert_error_code(raw)` 按输入类型分派到已注册的转换器，返回 `_CodeConversion(key, known)`；内置 `ErrCode` / `str` 两个转换器（枚举走枚举转换器、字符串走字符串转换器），未知类型抛 `TypeError` 并提示 `register_error_code_converter` 扩展点，未来新增类型无需改动 `SSHMError` / `manager._fail`；`SSHMError` / `manager._fail` 利用 `known` 判断走错误码路径还是文本式透传
+- **i18n 命名空间统一**：git 错误码 `NO_ORIGIN_REMOTE` / `SSH_TEST_TIMEOUT` 误用的 `msg.*` 前缀统一改为 `err.*`，与全局错误码命名空间一致；旧 `msg.*` key 全项目零残留
+- **i18n 清单分组整理**：`templates.py` 的 `KEYS`（458 个 key）从半有序扁平列表整理为按 prefix 严格分块（misc/suggest/cmd/opt/hdr/lbl/prompt/menu/msg/err/sys/upd/ver），每块加 `# ---- prefix 说明 ----` 注释，组内按字母序；修正此前因命名空间改名错位、夹在 `msg.` 段的 3 个 `err.*` key，归位到 `err.` 块
+- **校验**：i18n 三表（templates / zh / en）key 完全一致（458/458/458）；全量 113 测试通过，cli-report 60 场景全绿，deadcode 零冗余，pyright 0 警告
+
+### 📝 文档
+
+- 文档与版本号同步至 v0.0.5（INSTALL / UPDATE 安装示例）
+
+---
+
 ## [0.0.4] - 2026-08-21
 
 ### ✨ 新功能
