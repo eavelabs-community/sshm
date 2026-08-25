@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from ...i18n import _
 from ...language import K
-from ...ui.output import print
+from ...ui.output import print as rich_print
 from ...ui.output import section as print_section_header
 
 if TYPE_CHECKING:
@@ -31,11 +31,11 @@ class ConfigCommands:
 
         lang = get_lang()
         print_section_header(_(K.hdr.auto_author))
-        print(f"   {_(K.lbl.current_language)} {language_display_name(lang)} ({lang})")
+        rich_print(f"   {_(K.lbl.current_language)} {language_display_name(lang)} ({lang})")
 
         auto_author = self.m.state_manager.read_auto_author()
         status = _(K.misc.on) if auto_author else _(K.misc.off)
-        print(f"   🔀 {_(K.msg.auto_author_status, status=status)}")
+        rich_print(f"   🔀 {_(K.msg.auto_author_status, status=status)}")
 
     def language(self, lang: str) -> str:
         """设置输出语言并持久化到状态文件
@@ -52,3 +52,7 @@ class ConfigCommands:
 
         set_lang(lang)
         return lang
+
+
+# 保留旧别名，避免破坏外部调用方（此模块不定义 KeyCommands）
+# KeysCommands 在 keys.py 中定义

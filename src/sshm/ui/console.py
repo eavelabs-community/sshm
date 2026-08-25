@@ -206,8 +206,13 @@ def print_separator(char: str = "=", length: int = 80) -> None:
     """打印分隔线。
 
     真实终端用 rich Rule（彩色横线）；非 tty（管道/重定向/GBK 控制台）用
-    纯 ASCII 字符，避免 Unicode 横线被替换为乱码。
+    纯 ASCII 字符，避免 Unicode 横线被替换为乱码。NullOutput 下静默
+    （供 GUI/JSON/静默模式与测试隔离），延迟导入避免 console↔output 循环依赖。
     """
+    from .output import NullOutput, get_output
+
+    if isinstance(get_output(), NullOutput):
+        return
     if getattr(_console, "is_terminal", False):
         _console.print(Rule(style="cyan"))
     else:
@@ -216,10 +221,14 @@ def print_separator(char: str = "=", length: int = 80) -> None:
 
 def print_section_header(title: str) -> None:
     """打印章节标题（基于 rich Rule + 粗体标题）。"""
+    from .output import NullOutput, get_output
+
+    if isinstance(get_output(), NullOutput):
+        return
     if getattr(_console, "is_terminal", False):
         _console.print(Rule(f"[bold]{title}[/bold]", style="cyan"))
     else:
-        _console.print(title)
+        print(title)
 
 
 def wait_for_key() -> None:

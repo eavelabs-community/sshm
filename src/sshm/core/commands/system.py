@@ -16,9 +16,8 @@ from ...ui.console import prompt_confirm
 from ...ui.icons import done as _done
 from ...ui.icons import ok as _ok
 from ...ui.icons import tip as _tip
-from ...ui.output import print
+from ...ui.output import print as rich_print
 from ...ui.output import separator as print_separator
-
 
 if TYPE_CHECKING:
     from ..manager import SSHKeyManager
@@ -51,12 +50,12 @@ class SystemCommands:
 
         updater = UpdateManager()
         print_separator()
-        print(_(K.hdr.update))
+        rich_print(_(K.hdr.update))
         print_separator()
-        print(f"\n{_(K.lbl.current_version)} v{updater.current_version}")
-        print(f"{_(K.lbl.platform)} {updater.platform}")
+        rich_print(f"\n{_(K.lbl.current_version)} v{updater.current_version}")
+        rich_print(f"{_(K.lbl.platform)} {updater.platform}")
 
-        print("\n" + _(K.upd.checking))
+        rich_print("\n" + _(K.upd.checking))
         try:
             update_info = updater.check_update(force=force)
         except UpdateCheckError as e:
@@ -64,7 +63,7 @@ class SystemCommands:
             return 1
 
         if not update_info:
-            print(_ok(K.upd.up_to_date))
+            rich_print(_ok(K.upd.up_to_date))
             return None
 
         return self._apply_update(updater, update_info, check=check, yes=yes)
@@ -87,14 +86,14 @@ class SystemCommands:
 
         updater = UpdateManager()
         print_separator()
-        print(_(K.hdr.update))
+        rich_print(_(K.hdr.update))
         print_separator()
-        print(f"\n{_(K.lbl.current_version)} v{updater.current_version}")
-        print(f"{_(K.lbl.platform)} {updater.platform}")
+        rich_print(f"\n{_(K.lbl.current_version)} v{updater.current_version}")
+        rich_print(f"{_(K.lbl.platform)} {updater.platform}")
 
         try:
             if target_version:
-                print("\n" + _(K.upd.reinstall_checking, version=target_version))
+                rich_print("\n" + _(K.upd.reinstall_checking, version=target_version))
                 update_info = updater.get_release_by_tag(target_version)
                 if not update_info:
                     self.m._fail(_(K.upd.reinstall_not_found, version=target_version))
@@ -103,7 +102,7 @@ class SystemCommands:
                 return self._apply_update(updater, update_info, check=False, yes=yes, reinstall=True)
             else:
                 # 不指定版本：重装当前版本（强制覆盖），不判断新旧
-                print("\n" + _(K.upd.reinstall_checking, version=f"v{updater.current_version}"))
+                rich_print("\n" + _(K.upd.reinstall_checking, version=f"v{updater.current_version}"))
                 update_info = updater.get_release_by_tag(f"v{updater.current_version}")
                 if not update_info:
                     self.m._fail(_(K.upd.reinstall_not_found, version=f"v{updater.current_version}"))
@@ -126,27 +125,27 @@ class SystemCommands:
 
         update / reinstall 共用：负责信息展示、确认逻辑、下载调用。
         """
-        print(f"\n{_done(K.upd.new_version, version=update_info['version'])}")
-        print(f"{_(K.upd.release_date)} {update_info.get('published_at') or _(K.msg.unknown)}")
+        rich_print(f"\n{_done(K.upd.new_version, version=update_info['version'])}")
+        rich_print(f"{_(K.upd.release_date)} {update_info.get('published_at') or _(K.msg.unknown)}")
 
         if update_info.get("body"):
-            print(f"\n{_(K.upd.update_notes)}")
+            rich_print(f"\n{_(K.upd.update_notes)}")
             for line in update_info["body"].split("\n")[:10]:
-                print(f"  {line}")
+                rich_print(f"  {line}")
             if len(update_info["body"].split("\n")) > 10:
-                print("  ...")
+                rich_print("  ...")
 
         if check:
-            print(f"\n{_tip(K.upd.run_update)}")
+            rich_print(f"\n{_tip(K.upd.run_update)}")
             return None
 
         if not yes:
-            print()
+            rich_print()
             if not prompt_confirm(_(K.upd.prompt, version=update_info["version"]), default="y"):
                 self.m._fail(_(K.upd.cancelled))
                 return None
 
-        print()
+        rich_print()
         success = updater.download_and_update(update_info["download_url"])
         return 0 if success else 1
 

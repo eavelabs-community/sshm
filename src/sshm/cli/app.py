@@ -109,7 +109,11 @@ def _show_tip(group: str | None = None, name: str | None = None) -> None:
         cmd_group: str = group
         current: str = name
     else:
-        frame = sys._getframe(1)
+        # sys._getframe(1) 是 CPython 内部实现，PyPy/RustPython 不支持。
+        # 保留此调用链是因为 caller 通常就是本文件的 @app.callback() 装饰函数，
+        # 无法改由显式传参，只能接受此实现依赖。
+        import sys as _sys  # noqa: PLC0415
+        frame = _sys._getframe(1)  # pyright: ignore[reportArgumentType]
         fn = frame.f_globals.get(frame.f_code.co_name)
         cmd = getattr(fn, "__sshm_command__", None)
         if not cmd:

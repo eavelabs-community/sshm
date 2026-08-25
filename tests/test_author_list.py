@@ -24,7 +24,12 @@ def _make_author_cmds(manager, repo_dir, local, global_):
 
     local / global_ 是 (name, email) 元组，None 表示未设置。
     """
+    class _FakeService:
+        def __init__(self):
+            self.git_get_config = lambda repo_path, scope, key: None
+
     cmds = AuthorCommands(manager)
+    cmds.m.author_service = _FakeService()
 
     def fake_git_get_config(repo_path, scope, key):
         pair = local if scope == "local" else global_
@@ -54,7 +59,7 @@ def test_joint_match_marks_correct_author(manager, repo_dir, capsys):
         ],
     )
     cmds = _make_author_cmds(manager, repo_dir, ("365tools", "365tools.t1@gmail.com"), None)
-    cmds.list(repo_dir)
+    cmds.list()
     out = capsys.readouterr().out
     # eavelabs 的邮箱命中但姓名不命中，不应标 📍
     assert "eavelabs" in out
@@ -73,7 +78,7 @@ def test_no_match_shows_warning(manager, repo_dir, capsys):
     )
     # 生效作者为 365tools <365tools.t1@gmail.com>：name 在 work，email 在 alt，组合不存在
     cmds = _make_author_cmds(manager, repo_dir, ("365tools", "365tools.t1@gmail.com"), None)
-    cmds.list(repo_dir)
+    cmds.list()
     out = capsys.readouterr().out
     # 注意：rich 可能折行，故用不跨行的片段断言
     assert "不在已保存列表中" in out or "NOT in the" in out
@@ -89,7 +94,7 @@ def test_exact_match_marks_one(manager, repo_dir, capsys):
         ],
     )
     cmds = _make_author_cmds(manager, repo_dir, ("365tools", "365tools.t1@gmail.com"), None)
-    cmds.list(repo_dir)
+    cmds.list()
     out = capsys.readouterr().out
     lines = out.splitlines()
     marked = [ln for ln in lines if "📍" in ln]

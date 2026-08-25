@@ -10,28 +10,19 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-
-from ..utils.parse import split_pair
 from typing import TYPE_CHECKING
 
 from ...i18n import _
 from ...language import K
 from ...ui.output import (
     ICON_WARN,
-)
-from ...ui.output import (
     confirm as prompt_confirm,
-)
-from ...ui.output import (
     print as rich_print,
-)
-from ..errors import ErrCode
-from ...ui.output import (
     section as print_section_header,
-)
-from ...ui.output import (
     status as output_status,
 )
+from ..errors import ErrCode
+from ..utils.parse import split_pair
 
 if TYPE_CHECKING:
     from ..manager import SSHKeyManager
@@ -186,7 +177,7 @@ class HistoryCommands:
                 # 复用预览导出的字节流，避免「预览 + 实际」重复 fast-export 完整历史
                 result = rewrite_history(repo_path, cfg, original=original)
         except Exception as e:
-            self.m._fail(ErrCode.REWRITE_FAILED, err=e)
+            self.m._fail(ErrCode.REWRITE_FAILED, err=repr(e))
             return
 
         rich_print(f"\n✅ {_(K.msg.history_rewritten)}")

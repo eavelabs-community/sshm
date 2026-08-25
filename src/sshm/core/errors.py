@@ -237,7 +237,7 @@ _RAW_SPECS: dict[ErrCode, ErrorSpec] = {
     ErrCode.AUTHOR_EMPTY: ErrorSpec(ErrCode.AUTHOR_EMPTY, "err.author_empty", None),
     ErrCode.AUTO_AUTHOR_FAILED: ErrorSpec(ErrCode.AUTO_AUTHOR_FAILED, "err.auto_author_failed", None),
     # --- history rewrite ---
-    ErrCode.REWRITE_USAGE: ErrorSpec(ErrCode.REWRITE_USAGE, "err.author_exclusive", "err.rewrite_usage_tip"),
+    ErrCode.REWRITE_USAGE: ErrorSpec(ErrCode.REWRITE_USAGE, "err.rewrite_usage_author_exclusive", "err.rewrite_usage_tip"),
     ErrCode.NEED_OLD: ErrorSpec(ErrCode.NEED_OLD, "err.need_old", "err.rewrite_usage_tip"),
     ErrCode.NEED_NEW: ErrorSpec(ErrCode.NEED_NEW, "err.need_new", "err.rewrite_usage_tip"),
     ErrCode.NO_MATCHES: ErrorSpec(ErrCode.NO_MATCHES, "err.no_matches", None, warn=True),

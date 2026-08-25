@@ -16,6 +16,8 @@ class StateManager:
 
     def __init__(self, state_file: Path):
         self.state_file = state_file
+        # 状态文件位于 SSH 目录下，故其父目录即 ssh_dir
+        self.ssh_dir = state_file.parent
         # 进程内缓存：CLI 单进程场景下避免每个操作都重读磁盘
         self._cache: dict | None = None
 
@@ -83,6 +85,14 @@ class StateManager:
             del state[key_type]
             self._write_state(state)
 
+    def clear_active_keys(self):
+        """清除所有激活密钥状态（保留顶层保留字段）。"""
+        state = self._read_state()
+        for k in list(state.keys()):
+            if k not in self.RESERVED_KEYS:
+                del state[k]
+        self._write_state(state)
+
     def update_label(self, old_label: str, new_label: str):
         """更新状态文件中的标签名（含作者与主机映射）"""
         state = self._read_state()
@@ -137,6 +147,78 @@ class StateManager:
             del authors[label.lower()]
             self._write_state(state)
 
+    def write_authors(self, authors: dict[str, dict[str, str]]):
+        """批量写入作者信息（替换整个字典）"""
+        state = self._read_state()
+        state["authors"] = authors
+        self._write_state(state)
+
+    def read_default_author(self) -> str | None:
+        """读取默认作者标签"""
+        state = self._read_state()
+        return state.get("default_author") if isinstance(state.get("default_author"), str) else None
+
+    def write_default_author(self, label: str | None) -> None:
+        """设置默认作者标签"""
+        state = self._read_state()
+        if label is not None:
+            state["default_author"] = label.lower()
+        else:
+            state.pop("default_author", None)
+        self._write_state(state)
+
+    def read_keys(self) -> list[dict[str, str]]:
+        """读取所有密钥记录列表"""
+        state = self._read_state()
+        keys = state.get("keys", [])
+        return keys if isinstance(keys, list) else []
+
+    def write_keys(self, keys: list[dict[str, str]]) -> None:
+        """批量写入密钥记录列表（替换整个列表）"""
+        state = self._read_state()
+        state["keys"] = keys
+        self._write_state(state)
+
+    def read_default_key(self) -> str | None:
+        """读取默认密钥标签"""
+        state = self._read_state()
+        return state.get("default_key") if isinstance(state.get("default_key"), str) else None
+
+    def write_default_key(self, label: str | None) -> None:
+        """设置默认密钥标签"""
+        state = self._read_state()
+        if label is not None:
+            state["default_key"] = label.lower()
+        else:
+            state.pop("default_key", None)
+        self._write_state(state)
+
+    def read_repos(self) -> list[dict[str, str]]:
+        """读取所有仓库记录列表"""
+        state = self._read_state()
+        repos = state.get("repos", [])
+        return repos if isinstance(repos, list) else []
+
+    def write_repos(self, repos: list[dict[str, str]]) -> None:
+        """批量写入仓库记录列表（替换整个列表）"""
+        state = self._read_state()
+        state["repos"] = repos
+        self._write_state(state)
+
+    def read_current_repo(self) -> str | None:
+        """读取当前仓库路径"""
+        state = self._read_state()
+        return state.get("current_repo") if isinstance(state.get("current_repo"), str) else None
+
+    def write_current_repo(self, path: str | None) -> None:
+        """设置当前仓库路径"""
+        state = self._read_state()
+        if path is not None:
+            state["current_repo"] = path
+        else:
+            state.pop("current_repo", None)
+        self._write_state(state)
+
     # ------------------------------------------------------------------
     # hosts 相关（label -> hostname 映射，供 use/remove/rename 使用）
     # ------------------------------------------------------------------
@@ -154,6 +236,12 @@ class StateManager:
         if not isinstance(hosts, dict):
             hosts = state["hosts"] = {}
         hosts[label.lower()] = hostname
+        self._write_state(state)
+
+    def write_hosts(self, hosts: dict[str, str]):
+        """批量写入主机名映射（替换整个字典）"""
+        state = self._read_state()
+        state["hosts"] = hosts
         self._write_state(state)
 
     def remove_host(self, label: str):

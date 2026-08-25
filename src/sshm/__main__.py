@@ -14,7 +14,7 @@ import click
 try:
     from typer._click.exceptions import UsageError as _TyperUsageError
 except ImportError:
-    _TyperUsageError = click.UsageError
+    _TyperUsageError = click.UsageError  # type: ignore[assignment,misc]
 
 from .constants import DEFAULT_SSH_DIR, STATE_FILE_NAME
 from .core.errors import SSHMError

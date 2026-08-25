@@ -10,7 +10,7 @@ from pathlib import Path
 from ....i18n import _
 from ....language import K
 from ....ui.console import print_section_header, prompt_confirm
-from ....ui.output import print
+from ....ui.output import print as rich_print
 from ....ui.tip import render_business_error
 
 
@@ -32,8 +32,8 @@ def add_to_path() -> bool:
         exe_path = Path(__file__).parent.parent.resolve()
         exe_dir = exe_path
 
-    print(f"{_(K.sys.current_exe, path=exe_path)}")
-    print(f"{_(K.sys.directory, dir=exe_dir)}")
+    rich_print(f"{_(K.sys.current_exe, path=exe_path)}")
+    rich_print(f"{_(K.sys.directory, dir=exe_dir)}")
 
     if sys.platform == "win32":
         return _add_to_windows_path(exe_dir)
@@ -70,11 +70,11 @@ def _add_to_windows_path(exe_dir: Path) -> bool:
         existing_paths = [p for p in path_entries if Path(p).resolve() == exe_dir.resolve()]
 
         if existing_paths:
-            print(_(K.sys.path_exists, path=existing_paths[0]))
+            rich_print(_(K.sys.path_exists, path=existing_paths[0]))
 
             if existing_paths[0] != exe_dir_str:
-                print(_(K.sys.current_path, path=exe_dir_str))
-                print(_(K.sys.existing_path, path=existing_paths[0]))
+                rich_print(_(K.sys.current_path, path=exe_dir_str))
+                rich_print(_(K.sys.existing_path, path=existing_paths[0]))
 
                 if prompt_confirm(_(K.sys.update_path_prompt), default="y"):
                     # 移除旧路径
@@ -89,9 +89,9 @@ def _add_to_windows_path(exe_dir: Path) -> bool:
                     # 广播环境变量更新
                     _broadcast_env_change()
 
-                    print("\n✅ " + _(K.sys.env_updated))
-                    print("\n💡 " + _(K.sys.restart_tip))
-                    print("   " + _(K.sys.use_sshm_directly))
+                    rich_print("\n✅ " + _(K.sys.env_updated))
+                    rich_print("\n💡 " + _(K.sys.restart_tip))
+                    rich_print("   " + _(K.sys.use_sshm_directly))
                 else:
                     render_business_error(_(K.misc.operation_cancelled))
                     winreg.CloseKey(key)
@@ -110,10 +110,10 @@ def _add_to_windows_path(exe_dir: Path) -> bool:
             # 广播环境变量更新
             _broadcast_env_change()
 
-            print("\n✅ " + _(K.sys.env_added))
-            print(f"   {exe_dir_str}")
-            print("\n💡 " + _(K.sys.restart_tip))
-            print("   " + _(K.sys.use_sshm_directly))
+            rich_print("\n✅ " + _(K.sys.env_added))
+            rich_print(f"   {exe_dir_str}")
+            rich_print("\n💡 " + _(K.sys.restart_tip))
+            rich_print("   " + _(K.sys.use_sshm_directly))
             return True
 
     except PermissionError:
@@ -148,11 +148,11 @@ def _add_to_unix_path(exe_dir: Path) -> bool:
     if rc_file.exists():
         content = rc_file.read_text(encoding="utf-8")
         if exe_dir_str in content:
-            print(_(K.sys.path_in, name=rc_file.name))
+            rich_print(_(K.sys.path_in, name=rc_file.name))
             return True
 
-    print(_(K.sys.will_add, path=rc_file))
-    print(_(K.sys.command, cmd=export_line))
+    rich_print(_(K.sys.will_add, path=rc_file))
+    rich_print(_(K.sys.command, cmd=export_line))
 
     if prompt_confirm("\n" + _("sys.continue"), default="y"):
         try:
@@ -160,13 +160,13 @@ def _add_to_unix_path(exe_dir: Path) -> bool:
                 f.write("\n# Added by sshm\n")
                 f.write(f"{export_line}\n")
 
-            print("\n✅ " + _(K.sys.config_added))
-            print("\n💡 " + _(K.sys.run_to_apply))
-            print(f"   source {rc_file}")
-            print("\n   " + _(K.sys.or_restart))
+            rich_print("\n✅ " + _(K.sys.config_added))
+            rich_print("\n💡 " + _(K.sys.run_to_apply))
+            rich_print(f"   source {rc_file}")
+            rich_print("\n   " + _(K.sys.or_restart))
             return True
         except Exception as e:
-            render_business_error(_(K.err.add_failed, err=e))
+            render_business_error(_(K.err.add_failed, err=repr(e)))
             return False
     else:
         render_business_error(_(K.misc.operation_cancelled))
